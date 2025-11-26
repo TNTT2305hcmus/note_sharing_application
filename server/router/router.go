@@ -3,8 +3,11 @@ package router
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"note_sharing_application/server/handlers"
+	"note_sharing_application/server/middlewares"
+	"os"
 
 	"github.com/gin-gonic/gin"
 	_ "github.com/go-sql-driver/mysql"
@@ -13,7 +16,16 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	db, err := sql.Open("mysql", "root:thaiHCMUS@2023@tcp(localhost:3306)/note_sharing_application")
+	dbUser := os.Getenv("DB_USER")
+	dbPass := os.Getenv("DB_PASSWORD")
+	dbHost := os.Getenv("DB_HOST")
+	dbPort := os.Getenv("DB_PORT")
+	dbName := os.Getenv("DB_NAME")
+
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s",
+		dbUser, dbPass, dbHost, dbPort, dbName)
+
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -28,7 +40,9 @@ func SetupRouter() *gin.Engine {
 	{
 		api.POST("/register", handlers.RegisterHandler)
 		api.POST("/login", handlers.LoginHandler)
+
 		noteRoutes := api.Group("/notes")
+		noteRoutes.Use(middlewares.AuthMiddleware())
 		{
 			noteRoutes.POST("", handlers.CreateNoteHandler)
 			noteRoutes.GET("", handlers.GetNoteHandler)

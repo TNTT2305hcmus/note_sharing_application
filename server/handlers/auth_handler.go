@@ -45,8 +45,8 @@ func RegisterHandler(c *gin.Context) {
 		c.JSON(500, gin.H{"error": "Database insert failed"})
 		return
 	}
+	
 	c.JSON(http.StatusOK, gin.H{"message": "User registered"})
-
 }
 
 func LoginHandler(c *gin.Context) {
