@@ -37,7 +37,7 @@ func RegisterHandler(c *gin.Context) {
 
 	// Luu DB
 	_, err = DB.Exec(
-		"INSERT INTO Users (Username, Password, PublicKey) VALUES (?, ?, ?)",
+		"INSERT INTO Users (Username, PasswordHash, PublicKey) VALUES (?, ?, ?)",
 		req.Username, req.Password, req.PublicKey,
 	)
 
@@ -66,5 +66,22 @@ func LoginHandler(c *gin.Context) {
 
 	fmt.Println("Username: ", req.Username)
 	fmt.Println("Password: ", req.Password)
+
+	var existID int
+	err = DB.QueryRow(
+		"SELECT ID FROM Users WHERE Username = ? AND PasswordHash = ?",
+		req.Username, req.Password,
+	).Scan(&existID)
+
+	if err == sql.ErrNoRows {
+		c.JSON(http.StatusOK, gin.H{"message": "Unsuccessful login"})
+		return
+	}
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Database select failed"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "User logined"})
 
 }

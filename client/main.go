@@ -13,7 +13,7 @@ import (
 func testLoginAPI() {
 	data := models.RegisterRequest{
 		Username: "QuocThai",
-		Password: "123",
+		Password: "1231",
 	}
 
 	// struct -> json
