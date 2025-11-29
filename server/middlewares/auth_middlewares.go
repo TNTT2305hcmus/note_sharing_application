@@ -1,10 +1,10 @@
 package middlewares
 
 import (
-	"net/http"
-	"strings"
 	"github.com/gin-gonic/gin"
-	"note_sharing_application/server/services" 
+	"net/http"
+	"note_sharing_application/server/services"
+	"strings"
 )
 
 /*
@@ -12,17 +12,17 @@ import (
 	phép tiếp tục thực hiện các chức năng, phải đăng nhập lại để nhận token mới
 
 	Khi người dùng thực hiện gọi API sẽ gửi token (header) kèm theo thông tin (body):
-	Chuẩn: 
+	Chuẩn:
 	Authorization: Bearer <token>
 	Content-Type: application/json
 	{
-    "title": "Ghi chú",          
+    "title": "Ghi chú",
     "content": "Nội dung đã mã hóa..."
 	}
 
 */
 
-// AuthMiddleware là hàm trả về một Gin Handler (trạm kiểm soát)
+// AuthMiddleware là hàm trả về một Gin Handler
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
@@ -54,6 +54,6 @@ func AuthMiddleware() gin.HandlerFunc {
 		c.Set("userID", claims.UserID)
 		c.Set("username", claims.Username)
 
-		c.Next() 
+		c.Next()
 	}
 }

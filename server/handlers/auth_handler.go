@@ -19,10 +19,6 @@ var DB *sql.DB
 func RegisterHandler(c *gin.Context) {
 	fmt.Println("RegisterHandler() is running...")
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Server is processing register request...",
-	})
-
 	// struct luu thong tin nhan tu client
 	var req models.RegisterRequest
 
@@ -61,7 +57,6 @@ func RegisterHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Database insert failed",
 		})
-		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -71,10 +66,6 @@ func RegisterHandler(c *gin.Context) {
 
 func LoginHandler(c *gin.Context) {
 	fmt.Println("LoginHandler() is running...")
-
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Server is processing login request...",
-	})
 
 	var req models.LoginRequest
 
@@ -121,6 +112,9 @@ func LoginHandler(c *gin.Context) {
 	// Generate JWT token from services
 	// Lưu ý: ID trong DB là int, hàm GenerateJWT cần string, nên convert
 	tokenString, err := services.GenerateJWT(strconv.Itoa(storedID), req.Username)
+
+	fmt.Println(tokenString)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Fail to generate JWT Token",
