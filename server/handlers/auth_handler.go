@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"net/http"
 	"note_sharing_application/server/models"
+	"note_sharing_application/server/services"
+	"note_sharing_application/server/utils"
+	"strconv"
 
 	"database/sql"
 
@@ -23,30 +26,47 @@ func RegisterHandler(c *gin.Context) {
 	// struct luu thong tin nhan tu client
 	var req models.RegisterRequest
 
-	// Kiem tra tinh hop le du lieu va chuyen JSON -> struct
+	// Parse dữ liệu nhận từ client
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid JSON",
+			"details": err.Error(),
+		})
 		return
 	}
 
-	// In ra de check
+	// Check
 	fmt.Println("Username: ", req.Username)
 	fmt.Println("Password: ", req.Password)
 	fmt.Println("Pulic Key: ", req.PublicKey)
 
+	// GenerateSalt
+	salt, err := utils.GenerateSalt()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Fail to generate salt",
+		})
+	}
+	// Hash password for saving to database
+	hashPassword := utils.HashPassword(req.Password, salt)
+
 	// Luu DB
 	_, err = DB.Exec(
-		"INSERT INTO Users (Username, PasswordHash, PublicKey) VALUES (?, ?, ?)",
-		req.Username, req.Password, req.PublicKey,
+		"INSERT INTO Users (Username, PasswordHash, Salt, PublicKey) VALUES (?, ?, ?, ?)",
+		req.Username, hashPassword, salt, req.PublicKey,
 	)
 
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Database insert failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Database insert failed",
+		})
 		return
 	}
-	
-	c.JSON(http.StatusOK, gin.H{"message": "User registered"})
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Successfully Registed",
+	})
 }
 
 func LoginHandler(c *gin.Context) {
@@ -60,28 +80,58 @@ func LoginHandler(c *gin.Context) {
 
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
-		c.JSON(400, gin.H{"error": "Invalid JSON"})
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "Invalid JSON",
+			"details": err.Error(),
+		})
 		return
 	}
+	var storedID int
+	var storedPassword string
+	var storedSalt string
 
-	fmt.Println("Username: ", req.Username)
-	fmt.Println("Password: ", req.Password)
-
-	var existID int
 	err = DB.QueryRow(
-		"SELECT ID FROM Users WHERE Username = ? AND PasswordHash = ?",
-		req.Username, req.Password,
-	).Scan(&existID)
+		"SELECT ID, PasswordHash, Salt FROM Users WHERE Username = ?",
+		req.Username,
+	).Scan(&storedID, &storedPassword, &storedSalt)
 
 	if err == sql.ErrNoRows {
-		c.JSON(http.StatusOK, gin.H{"message": "Unsuccessful login"})
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"message": "Unsuccesfully Login",
+		})
 		return
 	}
 	if err != nil {
-		c.JSON(500, gin.H{"error": "Database select failed"})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Database select failed",
+		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "User logined"})
+	// Check
+	match := utils.CheckPasswordHash(req.Password, storedSalt, storedPassword)
+
+	if !match {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "Unsuccesfully Login",
+		})
+		return
+	}
+
+	// Generate JWT token from services
+	// Lưu ý: ID trong DB là int, hàm GenerateJWT cần string, nên convert
+	tokenString, err := services.GenerateJWT(strconv.Itoa(storedID), req.Username)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Fail to generate JWT Token",
+		})
+		return
+	}
+
+	// Return to client (message + JWT Token)
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Succesfully Login",
+		"token":   tokenString,
+	})
 
 }

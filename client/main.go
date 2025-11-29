@@ -1,104 +1,57 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
+	"bufio"
 	"fmt"
-	"io"
-	"net/http"
-	"note_sharing_application/client/models"
+	"note_sharing_application/client/crypto"
+	"note_sharing_application/client/services"
+	"os"
+	"strings"
 )
 
-// Dung de test dang nhap
-func testLoginAPI() {
-	data := models.RegisterRequest{
-		Username: "QuocThai",
-		Password: "1231",
-	}
-
-	// struct -> json
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
-
-	// Tao http request
-	req, err := http.NewRequest("POST", "http://localhost:8080/api/login", bytes.NewBuffer(jsonData))
-	if err != nil {
-		panic(err)
-	}
-
-	// Set header
-	req.Header.Set("Content-Type", "application/json")
-
-	// Tao client
-	client := &http.Client{}
-
-	// Gui request
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	// defer dam bao resp.Body.Close() duoc thuc hien truoc khi ra khoi ham
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Status:", resp.Status)
-	fmt.Println("Response Body:", string(body))
-
-}
-
-// Dung de test dang ky
-func testRegisterAPI() {
-	data := models.RegisterRequest{
-		Username:  "QuocThai",
-		Password:  "123",
-		PublicKey: "456",
-	}
-
-	// struct -> json
-	jsonData, err := json.Marshal(data)
-	if err != nil {
-		panic(err)
-	}
-
-	// Tao http request
-	req, err := http.NewRequest("POST", "http://localhost:8080/api/register", bytes.NewBuffer(jsonData))
-	if err != nil {
-		panic(err)
-	}
-
-	// Set header
-	req.Header.Set("Content-Type", "application/json")
-
-	// Tao client
-	client := &http.Client{}
-
-	// Gui request
-	resp, err := client.Do(req)
-	if err != nil {
-		panic(err)
-	}
-
-	// defer dam bao resp.Body.Close() duoc thuc hien truoc khi ra khoi ham
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		panic(err)
-	}
-
-	fmt.Println("Status:", resp.Status)
-	fmt.Println("Response Body:", string(body))
-
-}
-
 func main() {
-	testRegisterAPI()
-	testLoginAPI()
+	reader := bufio.NewReader(os.Stdin)
+
+	fmt.Println("--- CLIENT APP ---")
+
+	// Nhập thông tin người dùng
+	fmt.Print("Nhập Username: ")
+	username, _ := reader.ReadString('\n')
+	username = strings.TrimSpace(username)
+
+	fmt.Print("Nhập Password: ")
+	password, _ := reader.ReadString('\n')
+	password = strings.TrimSpace(password)
+
+	// Client tự sinh cặp khóa (Private/Public) dựa trên G và P
+	fmt.Println("Đang sinh cặp khóa...")
+	privKey, pubKey, err := crypto.GenerateKeyPair()
+	if err != nil {
+		fmt.Println("Lỗi sinh khóa:", err)
+		return
+	}
+
+	// Chuyển Public Key sang String để gửi đi (Hex)
+	pubKeyStr := pubKey.String()
+	fmt.Printf("Public Key: %s\n", pubKeyStr)
+
+	// Gửi yêu cầu Đăng Ký
+	fmt.Println("\n--- Gửi yêu cầu Đăng Ký ---")
+	err = services.Register(username, password, pubKeyStr)
+	if err != nil {
+		fmt.Println("Lỗi:", err)
+		// Nếu muốn test login ngay cả khi user đã tồn tại thì không return ở đây
+	}
+
+	// 4. Gửi yêu cầu Đăng Nhập
+	fmt.Println("\n--- Gửi yêu cầu Đăng Nhập ---")
+	token, err := services.Login(username, password)
+	if err != nil {
+		fmt.Println("Lỗi:", err)
+		return
+	}
+
+	// In tạm token + private key ở đây để khỏi lỗi
+	fmt.Println("\nToken đã lưu:", token)
+	fmt.Println("\nPrivate key:", privKey)
 }

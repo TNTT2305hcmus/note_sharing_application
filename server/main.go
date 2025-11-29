@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
-	"github.com/joho/godotenv"
 	"log"
 	"note_sharing_application/server/router"
 	"os"
+
+	"github.com/gin-gonic/gin"
+	"github.com/joho/godotenv"
 )
 
 func main() {
@@ -16,12 +18,21 @@ func main() {
 		log.Fatal("Lỗi: Không tìm thấy file .env.")
 	}
 
+	mode := os.Getenv("GIN_MODE")
+	if mode == "release" {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
 	// Gọi hàm setup router đã tách ra file riêng
 	r := router.SetupRouter()
 
 	serverPort := os.Getenv("SERVER_PORT")
+	if serverPort == "" {
+		serverPort = "8080" // Mặc định chạy port 8080 nếu quên cấu hình
+		fmt.Println("Không tìm thấy SERVER_PORT, sử dụng mặc định: 8080")
+	}
 	// Chạy server tại cổng 8080
-	fmt.Println("Server đang chạy tại port " + serverPort)
+	fmt.Println("Server đang chạy tại http://localhost:" + serverPort)
 
 	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal("Không thể khởi động server:", err)
