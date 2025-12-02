@@ -40,6 +40,7 @@ func SetupRouter() *gin.Engine {
 	{
 		api.POST("/register", handlers.RegisterHandler)
 		api.POST("/login", handlers.LoginHandler)
+		api.GET("/server-public-key-rsa", handlers.GetServerPublicKeyRSA)
 
 		noteRoutes := api.Group("/notes")
 		noteRoutes.Use(middlewares.AuthMiddleware())
