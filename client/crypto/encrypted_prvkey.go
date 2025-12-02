@@ -59,7 +59,7 @@ func EncryptPrivateKeyWithPassword(privKeyHex string, password string) (string, 
 	return hex.EncodeToString(finalData), nil
 }
 
-// 3. Hàm giải mã Private Key khi đăng nhập
+// Giải mã Private Key khi đăng nhập
 func DecryptPrivateKeyWithPassword(encryptedHex string, password string) (string, error) {
 	data, err := hex.DecodeString(encryptedHex)
 	if err != nil {
