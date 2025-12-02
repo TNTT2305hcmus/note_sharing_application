@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"note_sharing_application/server/models"
@@ -32,10 +33,19 @@ func RegisterHandler(c *gin.Context) {
 		return
 	}
 
-	// Check
-	fmt.Println("Username: ", req.Username)
-	fmt.Println("Password: ", req.Password)
-	fmt.Println("Pulic Key: ", req.PublicKey)
+	// Chuyển encrytedPassword được gửi ở client dưới dạng byte thành dạng Base64
+	encryptedPassBytes, err := base64.StdEncoding.DecodeString(req.Password)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "EncyptedPassword is not Base64"})
+		return
+	}
+
+	// Giải mã password để tiến hành hash và lưu vào db
+	rawPassword, err := utils.DecryptOAEP(encryptedPassBytes)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Error decypted encryptedPassword"})
+		return
+	}
 
 	// GenerateSalt
 	salt, err := utils.GenerateSalt()
@@ -45,18 +55,19 @@ func RegisterHandler(c *gin.Context) {
 		})
 	}
 	// Hash password for saving to database
-	hashPassword := utils.HashPassword(req.Password, salt)
+	hashPassword := utils.HashPassword(rawPassword, salt)
 
 	// Luu DB
 	_, err = DB.Exec(
-		"INSERT INTO Users (Username, PasswordHash, Salt, PublicKey) VALUES (?, ?, ?, ?)",
-		req.Username, hashPassword, salt, req.PublicKey,
+		"INSERT INTO Users (Username, PasswordHash, Salt, EncryptedPrivateKey, PublicKey) VALUES (?, ?, ?, ?, ?)",
+		req.Username, hashPassword, salt, req.EncryptedPrivateKey, req.PublicKey,
 	)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Database insert failed",
 		})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -77,18 +88,34 @@ func LoginHandler(c *gin.Context) {
 		})
 		return
 	}
+
+	// Chuyển encrytedPassword được gửi ở client dưới dạng byte thành dạng Base64
+	encryptedPassBytes, err := base64.StdEncoding.DecodeString(req.Password)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "EncyptedPassword is not Base64"})
+		return
+	}
+
+	// Giải mã password để tiến hành hash và lưu vào db
+	rawPassword, err := utils.DecryptOAEP(encryptedPassBytes)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Error decypted encryptedPassword"})
+		return
+	}
+
 	var storedID int
-	var storedPassword string
+	var storedPassHash string
 	var storedSalt string
+	var storedEncryptedPrivKey string
 
 	err = DB.QueryRow(
-		"SELECT ID, PasswordHash, Salt FROM Users WHERE Username = ?",
+		"SELECT ID, PasswordHash, Salt, EncryptedPrivateKey FROM Users WHERE Username = ?",
 		req.Username,
-	).Scan(&storedID, &storedPassword, &storedSalt)
+	).Scan(&storedID, &storedPassHash, &storedSalt, &storedEncryptedPrivKey)
 
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": "Unsuccesfully Login",
+			"message": "SQL Error",
 		})
 		return
 	}
@@ -100,7 +127,7 @@ func LoginHandler(c *gin.Context) {
 	}
 
 	// Check
-	match := utils.CheckPasswordHash(req.Password, storedSalt, storedPassword)
+	match := utils.CheckPasswordHash(rawPassword, storedSalt, storedPassHash)
 
 	if !match {
 		c.JSON(http.StatusUnauthorized, gin.H{
@@ -113,7 +140,7 @@ func LoginHandler(c *gin.Context) {
 	// Lưu ý: ID trong DB là int, hàm GenerateJWT cần string, nên convert
 	tokenString, err := services.GenerateJWT(strconv.Itoa(storedID), req.Username)
 
-	fmt.Println(tokenString)
+	fmt.Println("\nToken String được sinh ra: \n", tokenString)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -122,10 +149,21 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// Return to client (message + JWT Token)
+	// Return to client (message + JWT Token + EncryptedPrivKey)
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Succesfully Login",
-		"token":   tokenString,
+		"message":               "Succesfully Login",
+		"token":                 tokenString,
+		"encrypted_private_key": storedEncryptedPrivKey,
 	})
 
+}
+
+// API get server public key RSA
+func GetServerPublicKeyRSA(c *gin.Context) {
+	pemString, err := utils.ExportPublicKeyAsPEM()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Error export Server public key RSA"})
+		return
+	}
+	c.JSON(200, gin.H{"server-public-key-rsa": pemString})
 }

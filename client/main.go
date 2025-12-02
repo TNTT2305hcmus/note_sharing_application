@@ -30,28 +30,22 @@ func main() {
 		fmt.Println("Lỗi sinh khóa:", err)
 		return
 	}
+	// Chuyển privKey, pubKey từ big.Int sang Hex
+	privKeyHex := privKey.Text(16)
+	pubKeyHex := pubKey.Text(16)
 
-	// Chuyển Public Key sang String để gửi đi (Hex)
-	pubKeyStr := pubKey.String()
-	fmt.Printf("Public Key: %s\n", pubKeyStr)
+	// Mã hóa privKey bằng password
+	encryptedPrivKey, err := crypto.EncryptPrivateKeyWithPassword(privKeyHex, password)
 
 	// Gửi yêu cầu Đăng Ký
 	fmt.Println("\n--- Gửi yêu cầu Đăng Ký ---")
-	err = services.Register(username, password, pubKeyStr)
-	if err != nil {
-		fmt.Println("Lỗi:", err)
-		// Nếu muốn test login ngay cả khi user đã tồn tại thì không return ở đây
-	}
+	err = services.Register(username, password, pubKeyHex, encryptedPrivKey)
 
 	// 4. Gửi yêu cầu Đăng Nhập
 	fmt.Println("\n--- Gửi yêu cầu Đăng Nhập ---")
-	token, err := services.Login(username, password)
-	if err != nil {
-		fmt.Println("Lỗi:", err)
-		return
-	}
+	token, encryptedPrivKey, err := services.Login(username, password)
 
 	// In tạm token + private key ở đây để khỏi lỗi
 	fmt.Println("\nToken đã lưu:", token)
-	fmt.Println("\nPrivate key:", privKey)
+	fmt.Println("\nPrivate key đã mã hóa:", encryptedPrivKey)
 }

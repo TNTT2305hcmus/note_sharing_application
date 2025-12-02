@@ -5,8 +5,9 @@ CREATE TABLE Users (
     ID INT AUTO_INCREMENT,
     Username VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci UNIQUE NOT NULL,
     PasswordHash VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
-    Salt VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL, -- Đã thêm cột Salt vào đây luôn
-    PublicKey TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    Salt VARCHAR(255) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
+    EncryptedPrivateKey TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci,
+    PublicKey TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL,
     PRIMARY KEY (ID)
 );
 
