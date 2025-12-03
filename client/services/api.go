@@ -18,6 +18,12 @@ type PublicKeyResponse struct {
 	ServerPublicKeyRSA string `json:"server-public-key-rsa"`
 }
 
+// Struct nhận client public key để tính khóa phiên K
+type UserPublicKeyResponse struct {
+	Username  string `json:"username"`
+	PublicKey string `json:"public_key"`
+}
+
 // Gọi API trả về server-public-key-rsa
 func GetServerPublicKeyRSA() (string, error) {
 	// Gọi API Lấy server-public-key-rsa
@@ -115,4 +121,26 @@ func Login(username, password string) (string, string, error) {
 
 	fmt.Println("Sucesfully Login!\n")
 	return result.Token, result.EncryptedPrivateKey, nil
+}
+
+// Gọi API trả về public_key của đối phương
+func GetUserPublicKey(targetUsername string) (string, error) {
+	resp, err := http.Get(BaseURL + "/users/" + targetUsername + "/pubkey")
+	if err != nil {
+		return "", fmt.Errorf("Error connected: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 404 {
+		return "", fmt.Errorf("User '%s' is not exist", targetUsername)
+	}
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("Error Server: %d", resp.StatusCode)
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	var res UserPublicKeyResponse
+	json.Unmarshal(body, &res)
+
+	return res.PublicKey, nil
 }

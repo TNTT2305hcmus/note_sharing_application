@@ -17,6 +17,7 @@ import (
 
 var DB *sql.DB
 
+// API đăng ký tài khoản mới
 func RegisterHandler(c *gin.Context) {
 	fmt.Println("RegisterHandler() is running...")
 
@@ -75,6 +76,7 @@ func RegisterHandler(c *gin.Context) {
 	})
 }
 
+// API đăng nhập
 func LoginHandler(c *gin.Context) {
 	fmt.Println("LoginHandler() is running...")
 
