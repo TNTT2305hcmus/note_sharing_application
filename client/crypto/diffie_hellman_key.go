@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"fmt"
 	"math/big"
 )
 
@@ -50,4 +51,23 @@ func GenerateKeyPair() (privateKey *big.Int, publicKey *big.Int, err error) {
 	publicKey = new(big.Int).Exp(G, privateKey, P)
 
 	return privateKey, publicKey, nil
+}
+
+// Tính toán khóa phiên chung K
+// Input:
+//
+//	privateKey: *big.Int
+//	peerPubKey: string
+func ComputeSharedSecret(myPrivKey *big.Int, peerPubKeyHex string) (*big.Int, error) {
+	// Chuyển peerPubKey từ string sang *big.Int
+	peerPubKey := new(big.Int)
+	_, success := peerPubKey.SetString(peerPubKeyHex, 16)
+	if !success {
+		return nil, fmt.Errorf("peerPubKey is not string")
+	}
+
+	// K = (peerPubKey ^ privateKey) mod P
+	sharedSecret := new(big.Int).Exp(peerPubKey, myPrivKey, P)
+
+	return sharedSecret, nil
 }
