@@ -18,6 +18,7 @@ type PublicKeyResponse struct {
 	ServerPublicKeyRSA string `json:"server-public-key-rsa"`
 }
 
+// Gọi API trả về server-public-key-rsa
 func GetServerPublicKeyRSA() (string, error) {
 	// Gọi API Lấy server-public-key-rsa
 	resp, err := http.Get(BaseURL + "/server-public-key-rsa")
@@ -40,6 +41,7 @@ func GetServerPublicKeyRSA() (string, error) {
 	return keyRes.ServerPublicKeyRSA, nil
 }
 
+// Yêu cầu đăng ký tài khoản
 func Register(username, password, pubKeyStr, encryptedPrivkey string) error {
 	// Lấy Server public key RSA để mã hóa password
 	serverRSAPubKey, err := GetServerPublicKeyRSA()
@@ -76,6 +78,7 @@ func Register(username, password, pubKeyStr, encryptedPrivkey string) error {
 	return nil
 }
 
+// Yêu cầu đăng nhập
 func Login(username, password string) (string, string, error) {
 	// Lấy Server public key RSA để mã hóa password
 	serverRSAPubKey, err := GetServerPublicKeyRSA()
