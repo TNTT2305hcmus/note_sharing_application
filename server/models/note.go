@@ -1,11 +1,14 @@
 package models
 
-import "time"
+import (
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 type Note struct {
-	ID               int    `json:"id"`
-	OwnerID          int    `json:"owner_id"`
-	Title            string    `json:"title"`
-	EncryptedContent string    `json:"encrypted_content"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID              primitive.ObjectID `bson:"_id,omitempty" json:"note_id"`
+	Title           string             `bson:"title" json:"title"`
+	CipherText      string             `bson:"cipher_text" json:"cipher_text"`             // Nội dung ghi chú đã mã hóa
+	EncryptedAesKey string             `bson:"encrypted_aes_key" json:"encrypted_aes_key"` // Key giải mã (đã bị bọc)
+	Owner           string             `bson:"owner" json:"owner"`                         // ID của người tạo (dạng string)
+	Receiver        string             `bson:"receiver" json:"receiver"`                   // ID của người nhận (nếu gửi đích danh)
 }

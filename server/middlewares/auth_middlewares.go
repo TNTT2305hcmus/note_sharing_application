@@ -1,10 +1,11 @@
 package middlewares
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"note_sharing_application/server/services"
 	"strings"
+
+	"github.com/gin-gonic/gin"
 )
 
 /*
@@ -43,7 +44,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		//Lấy token
 		token := parts[1]
 
-		claims, err := services.ValidateJWT(token)
+		claims, err := services.ValidateAuthJWT(token)
 		if err != nil {
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ hoặc đã hết hạn"})
 			c.Abort()
@@ -51,7 +52,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 
 		//Lưu thông tin xác thực thu được từ token vào Context để sử dụng
-		c.Set("userID", claims.UserID)
+		c.Set("userId", claims.UserID)
 		c.Set("username", claims.Username)
 
 		c.Next()

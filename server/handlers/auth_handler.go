@@ -111,7 +111,7 @@ func LoginHandler(c *gin.Context) {
 
 	// Generate JWT token from services
 	// Lưu ý: ID trong DB là int, hàm GenerateJWT cần string, nên convert
-	tokenString, err := services.GenerateJWT(strconv.Itoa(storedID), req.Username)
+	tokenString, err := services.GenerateAuthJWT(strconv.Itoa(storedID), req.Username)
 
 	fmt.Println(tokenString)
 
