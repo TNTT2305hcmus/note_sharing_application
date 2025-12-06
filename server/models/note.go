@@ -9,6 +9,13 @@ type Note struct {
 	Title           string             `bson:"title" json:"title"`
 	CipherText      string             `bson:"cipher_text" json:"cipher_text"`             // Nội dung ghi chú đã mã hóa
 	EncryptedAesKey string             `bson:"encrypted_aes_key" json:"encrypted_aes_key"` // Key giải mã (đã bị bọc)
-	Owner           string             `bson:"owner" json:"owner"`                         // ID của người tạo (dạng string)
-	Receiver        string             `bson:"receiver" json:"receiver"`                   // ID của người nhận (nếu gửi đích danh)
+	OwnerID         primitive.ObjectID `bson:"owner_id" json:"owner_id"`                   // ID của người tạo (dạng string)
+	ReceiverID      primitive.ObjectID `bson:"receiver_id" json:"receiver_id"`             // ID của người nhận
+}
+
+type CreateNoteInput struct {
+	Title           string
+	CipherText      string
+	EncryptedAesKey string
+	OwnerID         string // về sau cần chuyển về ObjectID để thêm vào database
 }

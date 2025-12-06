@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"note_sharing_application/server/models"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -60,23 +61,41 @@ func (r *UrlRepo) FindByID(ctx context.Context, strId string) (*models.Url, erro
 	return &url, nil
 }
 
-// Xóa URL theo ID
-func (r *UrlRepo) DeleteByID(ctx context.Context, idStr string) error {
-	hexID, err := primitive.ObjectIDFromHex(idStr)
-	if err != nil {
-		return errors.New("Invalid URL ID format")
-	}
+// xóa tất cả URL liên quan đến một NoteID
+func (r *UrlRepo) DeleteByNoteID(ctx context.Context, noteID primitive.ObjectID) error {
+	filter := bson.M{"note_id": noteID}
 
-	filter := bson.M{"_id": hexID}
-
-	result, err := r.Collection.DeleteOne(ctx, filter)
-	if err != nil {
-		return err
-	}
-
-	if result.DeletedCount == 0 {
-		return errors.New("URL not found to delete")
-	}
-
-	return nil
+	// Dùng DeleteMany vì 1 note có thể (về lý thuyết) có nhiều url được tạo ra
+	_, err := r.Collection.DeleteMany(ctx, filter)
+	return err
 }
+
+// tìm các url hợp lệ từ danh sách noteIDs
+func (r *UrlRepo) FindValidUrlsByNoteIDs(ctx context.Context, noteIDs []primitive.ObjectID) ([]models.Url, error) {
+
+	//lọc theo điều kiện
+	filter := bson.M{
+		"note_id":    bson.M{"$in": noteIDs},    // NoteID nằm trong danh sách truyền vào
+		"expires_at": bson.M{"$gt": time.Now()}, // Chưa hết hạn
+		"max_access": bson.M{"$gt": 0},          // (Tuỳ chọn) Còn lượt truy cập
+	}
+
+	// tìm tất cả url
+	cursor, err := r.Collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// đảm bảo đóng con trỏ sau khi dùng xong
+	defer cursor.Close(ctx)
+
+	// đọc tất cả kết quả vào urls
+	var urls []models.Url
+	if err := cursor.All(ctx, &urls); err != nil {
+		return nil, err
+	}
+
+	// trả về kết quả
+	return urls, nil
+}
+

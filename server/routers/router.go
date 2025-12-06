@@ -11,38 +11,37 @@ import (
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
-	// Cấu hình CORS (Nên có nếu Frontend và Backend khác port)
-	// r.Use(cors.Default())
-
-	api := r.Group("/")
+	// khởi tạo handlers ở đây để truyền vào các route
+	noteHandler := handlers.NewNoteHandler(nil, nil)
+	// group gốc
+	api := r.Group("/api")
 	{
-		// --- AUTH ROUTES (Giữ nguyên của bạn) ---
-		api.POST("/register", handlers.RegisterHandler)
-		api.POST("/login", handlers.LoginHandler)
-
-		// --- NOTE ROUTES ---
-		// Nhóm các API cần đăng nhập
-		noteRoutes := api.Group("/notes")
-
-		// Sử dụng Middleware xác thực người dùng (JWT)
-		noteRoutes.Use(middlewares.AuthMiddleware())
+		// group xác thực
+		auth := api.Group("/auth")
 		{
-			// CRUD Note cơ bản (Giữ nguyên của bạn)
-			noteRoutes.POST("", handlers.CreateNoteHandler) // Tạo note gốc
-			noteRoutes.GET("", handlers.GetNoteHandler)     // Lấy danh sách note
-
-			// --- URL SHARING ROUTES (Mới thêm vào) ---
-
-			// 1. Tạo URL chia sẻ cho một Note cụ thể
-			// Có thêm middleware: ValidateCreateUrl (check chủ sở hữu, check metadata)
-			noteRoutes.POST("/:note_id/url", middlewares.ValidateCreateUrl(), handlers.CreateNoteUrl)
-
-			//Nếu muốn xem thì cần tìm 1 url sẵn trước thì mới được truy cập
-			noteRoutes.GET("/:note_id/url", middlewares.ValidateUrlAccess(), handlers.GetNoteUrl)
-
-			//API xóa ghi chú, hủy chia sẻ viết ở đây
+			auth.POST("/register", handlers.RegisterHandler)
+			auth.POST("/login", handlers.LoginHandler)
 		}
-		api.GET("/note/:url_id", middlewares.AuthMiddleware(), middlewares.ValidateUrlAccess(), middlewares.ValidateUrl(), handlers.ViewNoteHandler)
+
+		// group cần đăng nhập
+		protected := api.Group("/")
+		protected.Use(middlewares.AuthMiddleware())
+		{
+			noteRoutes := protected.Group("/notes")
+			{
+				// POST /api/notes
+				// noteRoutes.POST("", handlers.CreateNote) 
+				// GET /api/notes/owned    
+				noteRoutes.GET("/owned", noteHandler.GetOwnedNotes) 
+				// GET /api/notes/received
+				noteRoutes.GET("/received", noteHandler.GetReceivedNotes)
+				// DELETE /api/notes/:note_id
+				noteRoutes.DELETE("/:note_id", noteHandler.DeleteNote)
+				// POST /api/notes/:note_id/share
+				
+				// DELETE /api/notes/:note_id/share/:share_id
+			}
+		}
 	}
 	return r
 }

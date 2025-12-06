@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"note_sharing_application/server/configs"
 	"note_sharing_application/server/routers"
 	"os"
 
@@ -31,8 +30,6 @@ func main() {
 		serverPort = "8080" // Mặc định chạy port 8080 nếu quên cấu hình
 		fmt.Println("Không tìm thấy SERVER_PORT, sử dụng mặc định: 8080")
 	}
-
-	configs.ConnectDatabasse()
 
 	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal("Không thể khởi động server:", err)

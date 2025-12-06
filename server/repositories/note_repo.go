@@ -2,7 +2,6 @@ package repositories
 
 import (
 	"context"
-	"errors"
 	"note_sharing_application/server/models"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -16,15 +15,15 @@ type NoteRepo struct {
 }
 
 // Nhận đúng bảng note
-func newNoteRepo(db *mongo.Database) *NoteRepo {
+func NewNoteRepo(db *mongo.Database) *NoteRepo {
 	return &NoteRepo{
 		Collection: db.Collection("note"),
 	}
 }
 
-func (r *NoteRepo) InsertOne(ctx context.Context, student models.Note) (string, error) {
+func (r *NoteRepo) InsertOne(ctx context.Context, note models.Note) (string, error) {
 	// Khi insert, field ID để trống (Zero Value), Mongo sẽ tự sinh
-	result, err := r.Collection.InsertOne(ctx, student)
+	result, err := r.Collection.InsertOne(ctx, note)
 	if err != nil {
 		return "", err
 	}
@@ -36,47 +35,65 @@ func (r *NoteRepo) InsertOne(ctx context.Context, student models.Note) (string, 
 	return "", nil
 }
 
-func (r *NoteRepo) FindByID(ctx context.Context, strId string) (*models.Note, error) {
-
-	// Chuyển từ string sang hex
-	hexId, err := primitive.ObjectIDFromHex(strId)
-	if err != nil {
-		return nil, errors.New("Invalid ID format")
-	}
-
+func (r *NoteRepo) FindByID(ctx context.Context, noteID primitive.ObjectID) (*models.Note, error) {
 	var note models.Note
-
-	// Tạo filter
-	filter := bson.M{"_id": hexId}
-
-	err = r.Collection.FindOne(ctx, filter).Decode(&note)
+	err := r.Collection.FindOne(ctx, bson.M{"_id": noteID}).Decode(&note)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, errors.New("Can not find note ID")
-		}
 		return nil, err
 	}
-
 	return &note, nil
 }
 
-func (r *NoteRepo) DeleteByID(ctx context.Context, idStr string) error {
-	// string -> hex
-	hexID, err := primitive.ObjectIDFromHex(idStr)
+func (r *NoteRepo) DeleteByID(ctx context.Context, noteID primitive.ObjectID) error {
+	_, err := r.Collection.DeleteOne(ctx, bson.M{"_id": noteID})
+	return err
+}
+
+// Tìm tất cả note do owner tạo
+func (r *NoteRepo) FindByOwnerID(ctx context.Context, ownerID primitive.ObjectID) ([]models.Note, error) {
+
+	// lọc theo owner
+	filter := bson.M{"owner_id": ownerID}
+
+	// tìm tất cả note
+	cursor, err := r.Collection.Find(ctx, filter)
 	if err != nil {
-		return errors.New("Invalid ID format")
+		return nil, err
+	}
+	// đảm bảo đóng con trỏ sau khi dùng xong
+	defer cursor.Close(ctx)
+
+	// chuyển kết quả thành slice
+	var notes []models.Note
+	if err := cursor.All(ctx, &notes); err != nil {
+		return nil, err
 	}
 
-	// 2. Delete
-	filter := bson.M{"_id": hexID}
-	result, err := r.Collection.DeleteOne(ctx, filter)
+	// trả về kết quả
+	return notes, nil
+}
+
+// Tìm tất cả note được gửi đến receiver
+func (r *NoteRepo) FindByReceiverID(ctx context.Context, receiverID primitive.ObjectID) ([]models.Note, error) {
+
+	// lọc theo receiver_id
+	filter := bson.M{"receiver_id": receiverID}
+
+	// tìm tất cả note
+	cursor, err := r.Collection.Find(ctx, filter)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	if result.DeletedCount == 0 {
-		return errors.New("Can not find note ID to delete")
+	// đảm bảo đóng con trỏ sau khi dùng xong
+	defer cursor.Close(ctx)
+
+	// chuyển kết quả thành slice
+	var notes []models.Note
+	if err := cursor.All(ctx, &notes); err != nil {
+		return nil, err
 	}
 
-	return nil
+	// trả về kết quả
+	return notes, nil
 }
