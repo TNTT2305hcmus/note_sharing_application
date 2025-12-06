@@ -14,9 +14,10 @@ type User struct {
 }
 
 type RegisterRequest struct {
-	Username  string `json:"username"`
-	Password  string `json:"password"`
-	PublicKey string `json:"public_key"`
+	Username         string `json:"username"`
+	Password         string `json:"password"`
+	PublicKey        string `json:"public_key"`
+	EncryptedPrivKey string `json:"encrypted_privKey"`
 }
 
 type LoginRequest struct {

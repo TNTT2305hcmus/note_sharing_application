@@ -21,6 +21,8 @@ func SetupRouter() *gin.Engine {
 		{
 			auth.POST("/register", handlers.RegisterHandler)
 			auth.POST("/login", handlers.LoginHandler)
+			auth.GET("/server-public-key-rsa", handlers.GetServerPublicKeyRSA)
+			auth.GET("/users/:username/pubkey", handlers.GetUserPublicKey)
 		}
 
 		// group cần đăng nhập
@@ -30,15 +32,15 @@ func SetupRouter() *gin.Engine {
 			noteRoutes := protected.Group("/notes")
 			{
 				// POST /api/notes
-				// noteRoutes.POST("", handlers.CreateNote) 
-				// GET /api/notes/owned    
-				noteRoutes.GET("/owned", noteHandler.GetOwnedNotes) 
+				// noteRoutes.POST("", handlers.CreateNote)
+				// GET /api/notes/owned
+				noteRoutes.GET("/owned", noteHandler.GetOwnedNotes)
 				// GET /api/notes/received
 				noteRoutes.GET("/received", noteHandler.GetReceivedNotes)
 				// DELETE /api/notes/:note_id
 				noteRoutes.DELETE("/:note_id", noteHandler.DeleteNote)
 				// POST /api/notes/:note_id/share
-				
+
 				// DELETE /api/notes/:note_id/share/:share_id
 			}
 		}
