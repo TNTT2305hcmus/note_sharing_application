@@ -103,4 +103,3 @@ func (s *NoteService) DeleteNote(ctx context.Context, noteIDStr string, requeste
 	return nil
 
 }
-

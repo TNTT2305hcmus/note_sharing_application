@@ -15,7 +15,7 @@ func main() {
 
 	err := godotenv.Load()
 	if err != nil {
-		log.Fatal("Lỗi: Không tìm thấy file .env.")
+		log.Fatal("Error: Not found .env file")
 	}
 
 	mode := os.Getenv("GIN_MODE")
@@ -27,13 +27,13 @@ func main() {
 
 	serverPort := os.Getenv("SERVER_PORT")
 	if serverPort == "" {
-		serverPort = "8080" // Mặc định chạy port 8080 nếu quên cấu hình
-		fmt.Println("Không tìm thấy SERVER_PORT, sử dụng mặc định: 8080")
+		serverPort = "8080"
+		fmt.Println("Not found server port, default port: 8080")
 	}
 
 	if err := r.Run(":" + serverPort); err != nil {
-		log.Fatal("Không thể khởi động server:", err)
+		log.Fatal("Can't run server:", err)
 	}
-	// Chạy server tại cổng 8080
-	fmt.Println("Server đang chạy tại http://localhost:" + serverPort)
+
+	fmt.Println("Server is running at http://localhost:" + serverPort)
 }

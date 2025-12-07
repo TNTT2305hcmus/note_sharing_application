@@ -1,131 +1,166 @@
 package handlers
 
 import (
+	"context"
+	"encoding/base64"
 	"fmt"
 	"net/http"
+	"time"
+
 	"note_sharing_application/server/models"
 	"note_sharing_application/server/services"
 	"note_sharing_application/server/utils"
-	"strconv"
-
-	"database/sql"
 
 	"github.com/gin-gonic/gin"
-	_ "github.com/go-sql-driver/mysql"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var DB *sql.DB
+var UserCollection *mongo.Collection
 
+// API register new account
 func RegisterHandler(c *gin.Context) {
 	fmt.Println("RegisterHandler() is running...")
 
-	// struct luu thong tin nhan tu client
+	// Parse
 	var req models.RegisterRequest
-
-	// Parse dữ liệu nhận từ client
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid JSON",
-			"details": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON", "details": err.Error()})
 		return
 	}
 
-	// Check
-	fmt.Println("Username: ", req.Username)
-	fmt.Println("Password: ", req.Password)
-	fmt.Println("Pulic Key: ", req.PublicKey)
+	// Decrypted Password (RSA/OAEP) from client
+	encryptedPassBytes, err := base64.StdEncoding.DecodeString(req.Password)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "EncyptedPassword is not Base64"})
+		return
+	}
 
-	// GenerateSalt
+	rawPassword, err := utils.DecryptOAEP(encryptedPassBytes)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Error decypted encryptedPassword"})
+		return
+	}
+
+	// Check user is valid
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	count, err := UserCollection.CountDocuments(ctx, bson.M{"username": req.Username})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database error"})
+		return
+	}
+	if count > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "Username already exists"})
+		return
+	}
+
+	// Generate Salt and hash password
 	salt, err := utils.GenerateSalt()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Fail to generate salt",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fail to generate salt"})
+		return
 	}
-	// Hash password for saving to database
-	hashPassword := utils.HashPassword(req.Password, salt)
+	hashPassword := utils.HashPassword(rawPassword, salt)
 
-	// Luu DB
-	_, err = DB.Exec(
-		"INSERT INTO Users (Username, PasswordHash, Salt, PublicKey) VALUES (?, ?, ?, ?)",
-		req.Username, hashPassword, salt, req.PublicKey,
-	)
+	// Create Object User
+	newUser := models.User{
+		Username:          req.Username,
+		EncryptedPassword: hashPassword,
+		Salt:              salt,
+		EncryptedPrivKey:  req.EncryptedPrivKey,
+		PubKey:            req.PublicKey,
+	}
 
+	// Insert to DB
+	_, err = UserCollection.InsertOne(ctx, newUser)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database insert failed",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database insert failed", "details": err.Error()})
+		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Successfully Registed",
+		"message": "Successfully Registered",
 	})
 }
 
+// API login
 func LoginHandler(c *gin.Context) {
 	fmt.Println("LoginHandler() is running...")
 
 	var req models.LoginRequest
 
+	// Parse
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":   "Invalid JSON",
-			"details": err.Error(),
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON", "details": err.Error()})
 		return
 	}
-	var storedID int
-	var storedPassword string
-	var storedSalt string
 
-	err = DB.QueryRow(
-		"SELECT ID, PasswordHash, Salt FROM Users WHERE Username = ?",
-		req.Username,
-	).Scan(&storedID, &storedPassword, &storedSalt)
+	// Decrypted password (RSA/OAEP) from client
+	encryptedPassBytes, err := base64.StdEncoding.DecodeString(req.Password)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "EncyptedPassword is not Base64"})
+		return
+	}
 
-	if err == sql.ErrNoRows {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": "Unsuccesfully Login",
-		})
+	rawPassword, err := utils.DecryptOAEP(encryptedPassBytes)
+	if err != nil {
+		c.JSON(400, gin.H{"error": "Error decypted encryptedPassword"})
+		return
+	}
+
+	// Check user in db
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var foundUser models.User
+	err = UserCollection.FindOne(ctx, bson.M{"username": req.Username}).Decode(&foundUser)
+
+	if err == mongo.ErrNoDocuments {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Incorrect username or password"})
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Database select failed",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Database select failed"})
 		return
 	}
 
-	// Check
-	match := utils.CheckPasswordHash(req.Password, storedSalt, storedPassword)
+	// Check hashpassword
+	match := utils.CheckPasswordHash(rawPassword, foundUser.Salt, foundUser.EncryptedPassword)
 
 	if !match {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"error": "Unsuccesfully Login",
-		})
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Incorrect username or password"})
 		return
 	}
 
-	// Generate JWT token from services
-	// Lưu ý: ID trong DB là int, hàm GenerateJWT cần string, nên convert
-	tokenString, err := services.GenerateAuthJWT(strconv.Itoa(storedID), req.Username)
+	// 5. Generate JWT token
+	// ObjectID -> Hex string
+	tokenString, err := services.GenerateAuthJWT(foundUser.ID.Hex(), foundUser.Username)
 
-	fmt.Println(tokenString)
+	fmt.Println("\nToken String: \n", tokenString)
 
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Fail to generate JWT Token",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fail to generate JWT Token"})
 		return
 	}
 
-	// Return to client (message + JWT Token)
+	// 6. Return response
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Succesfully Login",
-		"token":   tokenString,
+		"message":           "Succesfully Login",
+		"token":             tokenString,
+		"encrypted_privKey": foundUser.EncryptedPrivKey,
 	})
+}
 
+// API get server public key RSA
+func GetServerPublicKeyRSA(c *gin.Context) {
+	pemString, err := utils.ExportPublicKeyAsPEM()
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Error export Server public key RSA"})
+		return
+	}
+	c.JSON(200, gin.H{"server-public-key-rsa": pemString})
 }
