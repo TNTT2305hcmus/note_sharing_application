@@ -30,7 +30,7 @@ func ValidateCreateUrl() gin.HandlerFunc {
 		}
 
 		// 2. Kiểm tra người yêu cầu có phải chủ sở hữu không
-		if note.OwnerID.Hex() != currentUser {
+		if note.OwnerID != currentUser {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Yêu cầu không hợp lệ"})
 			return
 		}
@@ -77,7 +77,7 @@ func ValidateUrlAccess() gin.HandlerFunc {
 			return
 		}
 
-		if note.OwnerID.Hex() != currentUser || note.ReceiverID.Hex() != currentUser {
+		if note.OwnerID != currentUser || note.ReceiverID != currentUser {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Yêu cầu không hợp lệ"})
 			return
 		}

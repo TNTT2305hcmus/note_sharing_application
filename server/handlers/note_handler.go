@@ -7,14 +7,12 @@ import (
 )
 
 type NoteHandler struct {
-	ViewService *services.NoteService
 	NoteService *services.NoteService
 }
 
-func NewNoteHandler(v *services.NoteService, n *services.NoteService) *NoteHandler {
+func NewNoteHandler(s *services.NoteService) *NoteHandler {
 	return &NoteHandler{
-		ViewService: v,
-		NoteService: n,
+		NoteService: s,
 	}
 }
 
@@ -29,7 +27,7 @@ func (h *NoteHandler) GetOwnedNotes(c *gin.Context) {
 	}
 
 	// gọi service và gửi kết quả cho client
-	notes, err := h.ViewService.ViewOwnedNotes(c.Request.Context(), currentUserID)
+	notes, err := h.NoteService.ViewOwnedNotes(c.Request.Context(), currentUserID)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -46,7 +44,7 @@ func (h *NoteHandler) GetReceivedNotes(c *gin.Context) {
 	}
 
 	// gọi service và gửi kết quả cho client
-	notes, err := h.ViewService.ViewReceivedNotes(c.Request.Context(), currentUserID)
+	notes, err := h.NoteService.ViewReceivedNotes(c.Request.Context(), currentUserID)
 	if err != nil {
 		c.JSON(500, gin.H{"error": err.Error()})
 		return
@@ -57,7 +55,7 @@ func (h *NoteHandler) GetReceivedNotes(c *gin.Context) {
 func (h *NoteHandler) DeleteNote(c *gin.Context) {
 
 	// lấy id từ param
-	noteID := c.Param("id")
+	noteID := c.Param("note_id")
 
 	// lấy userID từ context, nhớ khớp với auth_middleware.go
 	userID := c.GetString("userId")

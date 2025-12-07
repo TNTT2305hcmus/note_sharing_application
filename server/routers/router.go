@@ -12,7 +12,7 @@ func SetupRouter() *gin.Engine {
 	r := gin.Default()
 
 	// khởi tạo handlers ở đây để truyền vào các route
-	noteHandler := handlers.NewNoteHandler(nil, nil)
+	noteHandler := handlers.NewNoteHandler(nil)
 	// group gốc
 	api := r.Group("/api")
 	{

@@ -62,16 +62,14 @@ func (r *UrlRepo) FindByID(ctx context.Context, strId string) (*models.Url, erro
 }
 
 // xóa tất cả URL liên quan đến một NoteID
-func (r *UrlRepo) DeleteByNoteID(ctx context.Context, noteID primitive.ObjectID) error {
+func (r *UrlRepo) DeleteByNoteID(ctx context.Context, noteID string) error {
 	filter := bson.M{"note_id": noteID}
-
-	// Dùng DeleteMany vì 1 note có thể (về lý thuyết) có nhiều url được tạo ra
 	_, err := r.Collection.DeleteMany(ctx, filter)
 	return err
 }
 
 // tìm các url hợp lệ từ danh sách noteIDs
-func (r *UrlRepo) FindValidUrlsByNoteIDs(ctx context.Context, noteIDs []primitive.ObjectID) ([]models.Url, error) {
+func (r *UrlRepo) FindValidUrlsByNoteIDs(ctx context.Context, noteIDs []string) ([]models.Url, error) {
 
 	//lọc theo điều kiện
 	filter := bson.M{

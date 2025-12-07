@@ -50,7 +50,7 @@ func (r *NoteRepo) DeleteByID(ctx context.Context, noteID primitive.ObjectID) er
 }
 
 // Tìm tất cả note do owner tạo
-func (r *NoteRepo) FindByOwnerID(ctx context.Context, ownerID primitive.ObjectID) ([]models.Note, error) {
+func (r *NoteRepo) FindByOwnerID(ctx context.Context, ownerID string) ([]models.Note, error) {
 
 	// lọc theo owner
 	filter := bson.M{"owner_id": ownerID}
@@ -68,13 +68,12 @@ func (r *NoteRepo) FindByOwnerID(ctx context.Context, ownerID primitive.ObjectID
 	if err := cursor.All(ctx, &notes); err != nil {
 		return nil, err
 	}
-
 	// trả về kết quả
 	return notes, nil
 }
 
 // Tìm tất cả note được gửi đến receiver
-func (r *NoteRepo) FindByReceiverID(ctx context.Context, receiverID primitive.ObjectID) ([]models.Note, error) {
+func (r *NoteRepo) FindByReceiverID(ctx context.Context, receiverID string) ([]models.Note, error) {
 
 	// lọc theo receiver_id
 	filter := bson.M{"receiver_id": receiverID}

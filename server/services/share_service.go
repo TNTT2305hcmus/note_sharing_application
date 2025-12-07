@@ -5,7 +5,6 @@ import (
 	"errors"
 	"note_sharing_application/server/configs"
 	"note_sharing_application/server/models"
-	"note_sharing_application/server/repositories"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -13,26 +12,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-type ShareService struct {
-	UrlRepo  *repositories.UrlRepo
-	NoteRepo *repositories.NoteRepo
-}
-
-func NewShareService(u *repositories.UrlRepo, n *repositories.NoteRepo) *ShareService {
-	return &ShareService{UrlRepo: u, NoteRepo: n}
-}
-
 // 1. Tạo URL mới
 func CreateUrl(noteId string, expiresIn string, maxAccess int) (string, error) {
 	duration, _ := time.ParseDuration(expiresIn)
 	expireTime := time.Now().Add(duration)
-	noteID, err := primitive.ObjectIDFromHex(noteId)
-	if err != nil {
-		return "", err
-	}
 
 	newUrl := models.Url{
-		NoteID:    noteID,
+		NoteID:    noteId,
 		ExpiresAt: expireTime,
 		MaxAccess: maxAccess,
 	}
@@ -84,7 +70,7 @@ func GetNote(url models.Url) (*models.Note, error) {
 	}
 
 	var note models.Note
-	noteId := url.NoteID
+	noteId, _ := primitive.ObjectIDFromHex(url.NoteID)
 
 	err = configs.GetCollection("notes").FindOne(context.TODO(), bson.M{"_id": noteId}).Decode(&note)
 	if err != nil {
