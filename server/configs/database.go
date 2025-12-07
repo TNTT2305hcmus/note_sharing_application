@@ -43,6 +43,6 @@ func ConnectDatabasse() *mongo.Client {
 }
 
 // Lấy nhanh một collection
-func GetCollection(client *mongo.Client, collectionName string) *mongo.Collection {
-	return client.Database("gfg").Collection(collectionName)
+func GetCollection(collectionName string) *mongo.Collection {
+	return DB.Database(os.Getenv("DB_NAME")).Collection("collectionName")
 }

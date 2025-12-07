@@ -30,7 +30,7 @@ func ValidateCreateUrl() gin.HandlerFunc {
 		}
 
 		// 2. Kiểm tra người yêu cầu có phải chủ sở hữu không
-		if note.Owner != currentUser {
+		if string(note.OwnerID) != currentUser {
 			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Yêu cầu không hợp lệ"})
 			return
 		}
