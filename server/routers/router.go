@@ -10,11 +10,8 @@ import (
 
 func SetupRouter() *gin.Engine {
 	r := gin.Default()
-
-	// khởi tạo handlers ở đây để truyền vào các route
-	noteHandler := handlers.NewNoteHandler(nil)
 	// group gốc
-	api := r.Group("/api")
+	api := r.Group("/")
 	{
 		// group xác thực
 		auth := api.Group("/auth")
@@ -29,23 +26,36 @@ func SetupRouter() *gin.Engine {
 		protected := api.Group("/")
 		protected.Use(middlewares.AuthMiddleware())
 		{
+			// Gom nhóm liên quan đến Notes: /api/notes
 			noteRoutes := protected.Group("/notes")
 			{
-				// POST /api/notes
+				// POST /notes
 				// noteRoutes.POST("", handlers.CreateNote)
-				// GET /api/notes/owned
-				noteRoutes.GET("/owned", noteHandler.GetOwnedNotes)
-				// GET /api/notes/received
-				noteRoutes.GET("/received", noteHandler.GetReceivedNotes)
-				// DELETE /api/notes/:note_id
-				noteRoutes.DELETE("/:note_id", noteHandler.DeleteNote)
-				// POST /api/notes/:note_id
-				noteRoutes.POST("/:note_id", handlers.CreateNoteUrl)
-				// GET /api/:note_id/url
-				noteRoutes.GET("/api/:note_id/url", handlers.GetNoteUrl)
-				// GET /api/:note_id/url
-				noteRoutes.GET("/note/:url_id", handlers.ViewNoteHandler)
+
+				// DELETE /notes/:note_id
+				noteRoutes.DELETE("/:note_id", handlers.DeleteNoteHandler)
+
+				// GET /notes/owned
+				noteRoutes.GET("/owned", handlers.GetOwnedNotes)
+
+				// GET /notes/inbox
+				noteRoutes.GET("/received", handlers.GetReceivedNoteURLs)
+
+				// --- URL SHARING ROUTES (Mới thêm vào) ---
+
+				// 1. Tạo URL chia sẻ cho một Note cụ thể
+				// Có thêm middleware: ValidateCreateUrl (check chủ sở hữu, check metadata)
+				noteRoutes.POST("/:note_id/url", middlewares.ValidateCreateUrl(), handlers.CreateNoteUrl)
+
+				//Nếu muốn xem thì cần tìm 1 url sẵn trước thì mới được truy cập
+				noteRoutes.GET("/:note_id/url", middlewares.ValidateUrlAccess(), handlers.GetNoteUrl)
+
+				//API xóa ghi chú, hủy chia sẻ viết ở đây
+
+				// GET /notes/url_id
+				noteRoutes.GET("/view/:url_id", handlers.ViewNoteHandler)
 			}
+			api.GET("/note/:url_id", middlewares.AuthMiddleware(), middlewares.ValidateUrlAccess(), middlewares.ValidateUrl(), handlers.ViewNoteHandler)
 		}
 	}
 	return r

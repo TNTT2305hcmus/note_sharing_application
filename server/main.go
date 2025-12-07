@@ -32,8 +32,7 @@ func main() {
 		fmt.Println("Không tìm thấy SERVER_PORT, sử dụng mặc định: 8080")
 	}
 
-	clientDB := configs.ConnectDatabasse()
-	clientDB.Database(os.Getenv("DB_NAME"))
+	configs.ConnectDB()
 
 	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal("Không thể khởi động server:", err)

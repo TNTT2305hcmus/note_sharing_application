@@ -4,45 +4,28 @@ import (
 	"context"
 	"log"
 	"os"
-	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-// Giúp các package khác gọi nó
-var DB *mongo.Client
+var DB *mongo.Database
 
-func ConnectDatabasse() *mongo.Client {
-
-	// Tạo context chỉ để kết nối và đặt timeout cho quá trình kết nối database
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-
-	// defer đảm bảo cancel được thực hiện cuối hàm
-	defer cancel()
-
-	// Lấy connection string của mongodb
-	uri := os.Getenv("CONNECTION_STRING")
-
-	// Tạo mongo.Client
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+func ConnectDB() {
+	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(os.Getenv("CONNECTION_STRING")))
 	if err != nil {
-		log.Fatal("Failed to create client: ", err)
+		log.Fatal(err)
 	}
 
-	// Ping kiểm tra kết nối
-	if err := client.Ping(ctx, readpref.Primary()); err != nil {
-		log.Fatal("Failed to ping cluster: ", err)
+	if err := client.Ping(context.TODO(), nil); err != nil {
+		log.Fatal("Error pinging MongoDB: ", err)
 	}
+	log.Println("Connected to MongoDB successfully")
 
-	log.Println("Connected to MongoDB successfully!")
-
-	// trả về client
-	return client
+	// Giả sử tên DB là NoteApp
+	DB = client.Database(os.Getenv("DB_NAME"))
 }
 
-// Lấy nhanh một collection
-func GetCollection(collectionName string) *mongo.Collection {
-	return DB.Database(os.Getenv("DB_NAME")).Collection("collectionName")
+func GetCollection(name string) *mongo.Collection {
+	return DB.Collection(name)
 }

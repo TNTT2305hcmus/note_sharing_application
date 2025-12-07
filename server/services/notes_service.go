@@ -3,91 +3,111 @@ package services
 import (
 	"context"
 	"errors"
+	"note_sharing_application/server/configs"
 	"note_sharing_application/server/models"
-	"note_sharing_application/server/repositories"
+	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-type NoteService struct {
-	NoteRepo *repositories.NoteRepo
-	UrlRepo  *repositories.UrlRepo
-}
-
-func NewNoteService(n *repositories.NoteRepo, u *repositories.UrlRepo) *NoteService {
-	return &NoteService{NoteRepo: n, UrlRepo: u}
-}
-
 // Service: xem tất cả ghi chú do một owner
-func (s *NoteService) ViewOwnedNotes(ctx context.Context, ownerIDStr string) ([]models.Note, error) {
-	return s.NoteRepo.FindByOwnerID(ctx, ownerIDStr)
-}
+func ViewOwnedNotes(ctx context.Context, ownerIDStr string) ([]models.Note, error) {
+	// lọc theo owner
+	filter := bson.M{"owner_id": ownerIDStr}
 
-// Servce: xem tất cả ghi chú được gửi đến receiver
-func (s *NoteService) ViewReceivedNotes(ctx context.Context, receiverIDStr string) ([]models.Note, error) {
+	// tìm tất cả note - lúc này chỉ mới trỏ đến collection
 
-	// tìm tất cả note được gửi đến receiver
-	allReceivedNotes, err := s.NoteRepo.FindByReceiverID(ctx, receiverIDStr)
+	cursor, err := configs.GetCollection("notes").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
 
-	// nếu không có note nào, trả về rỗng ngay
-	if len(allReceivedNotes) == 0 {
-		return []models.Note{}, nil
-	}
-
-	//!! lấy danh sách ID của các note trên
-	var noteIDStrs []string
-	noteMap := make(map[string]models.Note) // Map key đổi thành string cho dễ tra cứu
-
-	for _, note := range allReceivedNotes {
-		nidStr := note.ID.Hex() // Chuyển ObjectID -> String
-		noteIDStrs = append(noteIDStrs, nidStr)
-		noteMap[nidStr] = note
-	}
-
-	// lọc ra các URL hợp lệ tương ứng với các noteID trên
-	validUrls, err := s.UrlRepo.FindValidUrlsByNoteIDs(ctx, noteIDStrs)
-	if err != nil {
+	// load vào notes thực sự, All() = duyệt, decode, đóng cursor
+	var notes []models.Note
+	if err = cursor.All(ctx, &notes); err != nil {
 		return nil, err
-	}
-
-	// lưu kết quả cuối cùng
-	var finalNotes []models.Note
-	for _, url := range validUrls {
-		if note, exists := noteMap[url.NoteID]; exists {
-			finalNotes = append(finalNotes, note)
-		}
 	}
 
 	// trả về kết quả
-	return finalNotes, nil
+	return notes, nil
 }
 
-func (s *NoteService) DeleteNote(ctx context.Context, noteIDStr string, requesterIDStr string) error {
+// Servce: xem tất cả urls được gửi đến receiver
+func ViewReceivedNoteURLs(ctx context.Context, receiverIDStr string) ([]models.Url, error) {
 
-	noteID, err := primitive.ObjectIDFromHex(noteIDStr)
+	// lọc theo receiver_id
+	noteFilter := bson.M{"receiver_id": receiverIDStr}
+
+	// lấy tất cả các notes thỏa mãn lưu vào allReceivedNotes
+	noteCursor, err := configs.GetCollection("notes").Find(ctx, noteFilter)
 	if err != nil {
-		return errors.New("Note ID không hợp lệ")
+		return nil, err
 	}
-	// lấy note từ DB
-	note, err := s.NoteRepo.FindByID(ctx, noteID)
-	if err != nil {
-		return errors.New("ghi chú không tồn tại")
+	// load vào notes thực sự, All() = duyệt, decode, đóng cursor
+	var allReceivedNotes []models.Note
+	if err = noteCursor.All(ctx, &allReceivedNotes); err != nil {
+		return nil, err
 	}
 
-	// kiểm tra quyền sở hữu
-	if note.OwnerID != requesterIDStr {
-		return errors.New("bạn không có quyền xóa ghi chú này")
+	// Nếu không có note nào
+	if len(allReceivedNotes) == 0 {
+		return []models.Url{}, nil
 	}
-	// xóa trong collection note
-	if err := s.NoteRepo.DeleteByID(ctx, noteID); err != nil {
+
+	// Lấy ID để truy vấn URLs
+	noteIDStrs := make([]string, 0, len(allReceivedNotes))
+	for _, note := range allReceivedNotes {
+		noteIDStrs = append(noteIDStrs, note.ID.Hex())
+	}
+
+	// lọc url
+	urlFilter := bson.M{
+		"note_id":    bson.M{"$in": noteIDStrs}, // NoteID nằm trong danh sách truyền vào
+		"expires_at": bson.M{"$gt": time.Now()}, // Chưa hết hạn
+		"max_access": bson.M{"$gt": 0},          // Còn lượt truy cập
+	}
+
+	// lấy tất cả các urls thỏa mãn lưu vào validUrls
+	urlCursor, err := configs.GetCollection("urls").Find(ctx, urlFilter)
+	if err != nil {
+		return nil, err
+	}
+	var validUrls []models.Url
+	if err = urlCursor.All(ctx, &validUrls); err != nil {
+		return nil, err
+	}
+	return validUrls, nil
+}
+
+func DeleteNote(ctx context.Context, noteIDStr string, ownerIDStr string) error {
+
+	// string --> ObjectID lấy ID của node
+	NoteIDObj, err := primitive.ObjectIDFromHex(noteIDStr)
+	if err != nil {
+		return errors.New("invalid note ID format")
+	}
+
+	// lọc note id và người sở hữu
+	filter := bson.M{
+		"_id":      NoteIDObj,
+		"owner_id": ownerIDStr,
+	}
+
+	// Xóa note
+	res, err := configs.GetCollection("notes").DeleteOne(ctx, filter)
+	if err != nil {
 		return err
 	}
+	if res.DeletedCount == 0 {
+		return errors.New("non-exist note id")
+	}
 
-	// xóa trong collection url
-	_ = s.UrlRepo.DeleteByNoteID(ctx, noteIDStr)
+	// lọc note id
+	urlFilter := bson.M{"note_id": noteIDStr}
+
+	// Xóa URLs
+	_, _ = configs.GetCollection("urls").DeleteMany(ctx, urlFilter)
 
 	return nil
 

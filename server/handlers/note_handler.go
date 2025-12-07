@@ -1,87 +1,83 @@
 package handlers
 
 import (
+	"net/http"
 	"note_sharing_application/server/services"
 
 	"github.com/gin-gonic/gin"
 )
 
-type NoteHandler struct {
-	NoteService *services.NoteService
-}
-
-func NewNoteHandler(s *services.NoteService) *NoteHandler {
-	return &NoteHandler{
-		NoteService: s,
-	}
-}
-
 // lấy tất cả các notes do user hiện tại tạo
-func (h *NoteHandler) GetOwnedNotes(c *gin.Context) {
+func GetOwnedNotes(c *gin.Context) {
 	// userID cho khớp với auth_middleware.go
-	currentUserID := c.GetString("userId")
-
-	if currentUserID == "" {
-		c.JSON(401, gin.H{"error": "Unauthorized"})
+	ownerID := c.GetString("user_id")
+	if ownerID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found"})
 		return
 	}
 
 	// gọi service và gửi kết quả cho client
-	notes, err := h.NoteService.ViewOwnedNotes(c.Request.Context(), currentUserID)
+	notes, err := services.ViewOwnedNotes(c.Request.Context(), ownerID)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notes: " + err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{"data": notes})
+	if notes == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+	} else {
+		c.JSON(http.StatusOK, notes)
+	}
 }
 
 // lấy tất cả các notes được gửi đến user hiện tại
-func (h *NoteHandler) GetReceivedNotes(c *gin.Context) {
-	currentUserID := c.GetString("userId")
-	if currentUserID == "" {
-		c.JSON(401, gin.H{"error": "Unauthorized"})
+func GetReceivedNoteURLs(c *gin.Context) {
+	receiverID := c.GetString("user_id")
+	if receiverID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-
-	// gọi service và gửi kết quả cho client
-	notes, err := h.NoteService.ViewReceivedNotes(c.Request.Context(), currentUserID)
+	urls, err := services.ViewReceivedNoteURLs(c.Request.Context(), receiverID)
 	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch received URLs: " + err.Error()})
 		return
 	}
-	c.JSON(200, gin.H{"data": notes})
+	if urls == nil {
+		c.JSON(http.StatusOK, []interface{}{})
+	} else {
+		c.JSON(http.StatusOK, urls)
+	}
 }
 
-func (h *NoteHandler) DeleteNote(c *gin.Context) {
-
-	// lấy id từ param
-	noteID := c.Param("note_id")
-
-	// lấy userID từ context, nhớ khớp với auth_middleware.go
-	userID := c.GetString("userId")
-	if userID == "" {
-		c.JSON(401, gin.H{"error": "Unauthorized"})
+func DeleteNoteHandler(c *gin.Context) {
+	noteID := c.Param("id")
+	if noteID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Note ID is required"})
 		return
 	}
 
-	// gọi service
-	err := h.NoteService.DeleteNote(c.Request.Context(), noteID, userID)
+	ownerID := c.GetString("user_id")
+	if ownerID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
 
-	// gửi kết quả cho client
+	err := services.DeleteNote(c.Request.Context(), noteID, ownerID)
+
 	if err != nil {
 		errMsg := err.Error()
-		switch errMsg {
-		case "bạn không có quyền xóa ghi chú này":
-			c.JSON(403, gin.H{"error": errMsg})
-		case "ghi chú không tồn tại":
-			c.JSON(404, gin.H{"error": errMsg})
-		case "Note ID không hợp lệ":
-			c.JSON(400, gin.H{"error": errMsg})
-		default:
-			c.JSON(500, gin.H{"error": "Lỗi hệ thống: " + errMsg})
+		if errMsg == "invalid note ID format" {
+			// Lỗi 400: ID gửi lên không đúng định dạng Hex
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+		} else if errMsg == "non-exist note id" {
+			// Lỗi 404: Không tìm thấy note hoặc không có quyền (trả về 404 để bảo mật)
+			c.JSON(http.StatusNotFound, gin.H{"error": "Note not found or access denied"})
+		} else {
+			// Lỗi 500: Lỗi DB hoặc hệ thống khác
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		}
 		return
 	}
 
-	c.JSON(200, gin.H{"message": "Xóa ghi chú thành công"})
+	// Bước 5: Phản hồi thành công
+	c.JSON(http.StatusOK, gin.H{"message": "Note and related URLs deleted successfully"})
 }
