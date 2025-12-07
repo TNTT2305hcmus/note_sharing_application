@@ -12,20 +12,20 @@ import (
 )
 
 // Service: xem tất cả ghi chú do một owner
-func ViewOwnedNotes(ctx context.Context, ownerIDStr string) ([]models.Note, error) {
+func ViewOwnedNotes(ownerIDStr string) ([]models.Note, error) {
 	// lọc theo owner
 	filter := bson.M{"owner_id": ownerIDStr}
 
 	// tìm tất cả note - lúc này chỉ mới trỏ đến collection
 
-	cursor, err := configs.GetCollection("notes").Find(ctx, filter)
+	cursor, err := configs.GetCollection("notes").Find(context.TODO(), filter)
 	if err != nil {
 		return nil, err
 	}
 
 	// load vào notes thực sự, All() = duyệt, decode, đóng cursor
 	var notes []models.Note
-	if err = cursor.All(ctx, &notes); err != nil {
+	if err = cursor.All(context.TODO(), &notes); err != nil {
 		return nil, err
 	}
 
@@ -34,19 +34,19 @@ func ViewOwnedNotes(ctx context.Context, ownerIDStr string) ([]models.Note, erro
 }
 
 // Servce: xem tất cả urls được gửi đến receiver
-func ViewReceivedNoteURLs(ctx context.Context, receiverIDStr string) ([]models.Url, error) {
+func ViewReceivedNoteURLs(receiverIDStr string) ([]models.Url, error) {
 
 	// lọc theo receiver_id
 	noteFilter := bson.M{"receiver_id": receiverIDStr}
 
 	// lấy tất cả các notes thỏa mãn lưu vào allReceivedNotes
-	noteCursor, err := configs.GetCollection("notes").Find(ctx, noteFilter)
+	noteCursor, err := configs.GetCollection("notes").Find(context.TODO(), noteFilter)
 	if err != nil {
 		return nil, err
 	}
 	// load vào notes thực sự, All() = duyệt, decode, đóng cursor
 	var allReceivedNotes []models.Note
-	if err = noteCursor.All(ctx, &allReceivedNotes); err != nil {
+	if err = noteCursor.All(context.TODO(), &allReceivedNotes); err != nil {
 		return nil, err
 	}
 
@@ -69,18 +69,18 @@ func ViewReceivedNoteURLs(ctx context.Context, receiverIDStr string) ([]models.U
 	}
 
 	// lấy tất cả các urls thỏa mãn lưu vào validUrls
-	urlCursor, err := configs.GetCollection("urls").Find(ctx, urlFilter)
+	urlCursor, err := configs.GetCollection("urls").Find(context.TODO(), urlFilter)
 	if err != nil {
 		return nil, err
 	}
 	var validUrls []models.Url
-	if err = urlCursor.All(ctx, &validUrls); err != nil {
+	if err = urlCursor.All(context.TODO(), &validUrls); err != nil {
 		return nil, err
 	}
 	return validUrls, nil
 }
 
-func DeleteNote(ctx context.Context, noteIDStr string, ownerIDStr string) error {
+func DeleteNote(noteIDStr string, ownerIDStr string) error {
 
 	// string --> ObjectID lấy ID của node
 	NoteIDObj, err := primitive.ObjectIDFromHex(noteIDStr)
@@ -95,7 +95,7 @@ func DeleteNote(ctx context.Context, noteIDStr string, ownerIDStr string) error 
 	}
 
 	// Xóa note
-	res, err := configs.GetCollection("notes").DeleteOne(ctx, filter)
+	res, err := configs.GetCollection("notes").DeleteOne(context.TODO(), filter)
 	if err != nil {
 		return err
 	}
@@ -107,8 +107,55 @@ func DeleteNote(ctx context.Context, noteIDStr string, ownerIDStr string) error 
 	urlFilter := bson.M{"note_id": noteIDStr}
 
 	// Xóa URLs
-	_, _ = configs.GetCollection("urls").DeleteMany(ctx, urlFilter)
+	_, _ = configs.GetCollection("urls").DeleteMany(context.TODO(), urlFilter)
 
 	return nil
 
+}
+
+func CreateNote(title string, cipherText string, encryptedAesKey string, ownerIDStr string) (string, error) {
+	newNote := models.Note{
+		Title:           title,
+		CipherText:      cipherText,
+		EncryptedAesKey: encryptedAesKey,
+		OwnerID:         ownerIDStr,
+		ReceiverID:      "",
+	}
+
+	result, err := configs.GetCollection("notes").InsertOne(context.TODO(), newNote)
+	if err != nil {
+		return "", err
+	}
+
+	if oid, ok := result.InsertedID.(primitive.ObjectID); ok {
+		return oid.Hex(), nil
+	}
+	return "", err
+
+}
+
+func DeleteSharedNote(noteIDStr string, ownerIDStr string) error {
+	noteIDObj, err := primitive.ObjectIDFromHex(noteIDStr)
+	if err != nil {
+		return errors.New("invalid note ID format")
+	}
+
+	filter := bson.M{
+		"_id":         noteIDObj,
+		"owner_id":    ownerIDStr,
+		"receiver_id": bson.M{"$ne": ""}, // "" thì là sharedNote, còn khác "" là chưa share
+	}
+	res, err := configs.GetCollection("notes").DeleteOne(context.TODO(), filter)
+	if err != nil {
+		return err
+	}
+
+	if res.DeletedCount == 0 {
+		return errors.New("cannot revoke: note not found, unauthorized, or it is an original note")
+	}
+
+	urlFilter := bson.M{"note_id": noteIDStr}
+	_, _ = configs.GetCollection("urls").DeleteMany(context.TODO(), urlFilter)
+
+	return nil
 }

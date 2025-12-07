@@ -30,11 +30,14 @@ func SetupRouter() *gin.Engine {
 			noteRoutes := protected.Group("/notes")
 			{
 				// POST /notes
-				// noteRoutes.POST("", handlers.CreateNote)
+				noteRoutes.POST("", handlers.CreateNote)
 
 				// DELETE /notes/:note_id
-				noteRoutes.DELETE("/:note_id", handlers.DeleteNoteHandler)
+				noteRoutes.DELETE("/:note_id", handlers.DeleteNote)
 
+				// DELETE /notes/shared/:note_id
+				noteRoutes.DELETE("/shared/:note_id", handlers.DeleteSharedNote)
+				
 				// GET /notes/owned
 				noteRoutes.GET("/owned", handlers.GetOwnedNotes)
 

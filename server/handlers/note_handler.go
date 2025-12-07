@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"note_sharing_application/server/models"
 	"note_sharing_application/server/services"
 
 	"github.com/gin-gonic/gin"
@@ -17,9 +18,9 @@ func GetOwnedNotes(c *gin.Context) {
 	}
 
 	// gọi service và gửi kết quả cho client
-	notes, err := services.ViewOwnedNotes(c.Request.Context(), ownerID)
+	notes, err := services.ViewOwnedNotes(ownerID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch notes: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if notes == nil {
@@ -36,9 +37,9 @@ func GetReceivedNoteURLs(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
-	urls, err := services.ViewReceivedNoteURLs(c.Request.Context(), receiverID)
+	urls, err := services.ViewReceivedNoteURLs(receiverID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch received URLs: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	if urls == nil {
@@ -48,7 +49,7 @@ func GetReceivedNoteURLs(c *gin.Context) {
 	}
 }
 
-func DeleteNoteHandler(c *gin.Context) {
+func DeleteNote(c *gin.Context) {
 	noteID := c.Param("id")
 	if noteID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Note ID is required"})
@@ -61,7 +62,7 @@ func DeleteNoteHandler(c *gin.Context) {
 		return
 	}
 
-	err := services.DeleteNote(c.Request.Context(), noteID, ownerID)
+	err := services.DeleteNote(noteID, ownerID)
 
 	if err != nil {
 		errMsg := err.Error()
@@ -80,4 +81,57 @@ func DeleteNoteHandler(c *gin.Context) {
 
 	// Bước 5: Phản hồi thành công
 	c.JSON(http.StatusOK, gin.H{"message": "Note and related URLs deleted successfully"})
+}
+
+func CreateNote(c *gin.Context) {
+	ownerIDStr := c.GetString("user_id")
+	if ownerIDStr == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	var req models.CreateNoteRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
+		return
+	}
+
+	noteID, err := services.CreateNote(req.Title, req.CipherText, req.EncryptedAesKey, req.OwnerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create note: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Note created successfully",
+		"note_id": noteID,
+	})
+
+}
+
+func DeleteSharedNote(c *gin.Context) {
+	noteID := c.Param("note_id")
+	ownerID := c.GetString("user_id")
+
+	if ownerID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+
+	err := services.DeleteSharedNote(noteID, ownerID)
+
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "invalid note ID format" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+		} else if errMsg == "cannot revoke: note not found, unauthorized, or it is an original note" {
+			// Trả về 403 (Forbidden) hoặc 404 tùy ý định, ở đây 400/403 để báo user biết họ đang cố xóa cái không được xóa
+			c.JSON(http.StatusForbidden, gin.H{"error": errMsg})
+		} else {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": errMsg})
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Delete sharing successfully"})
 }

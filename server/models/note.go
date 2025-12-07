@@ -13,7 +13,7 @@ type Note struct {
 	ReceiverID      string             `bson:"receiver_id" json:"receiver_id"`             // ID của người nhận
 }
 
-type CreateNoteInput struct {
+type CreateNoteRequest struct {
 	Title           string
 	CipherText      string
 	EncryptedAesKey string
