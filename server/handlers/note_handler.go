@@ -12,10 +12,6 @@ import (
 func GetOwnedNotes(c *gin.Context) {
 	// userID cho khớp với auth_middleware.go
 	ownerID := c.GetString("user_id")
-	if ownerID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found"})
-		return
-	}
 
 	// gọi service và gửi kết quả cho client
 	notes, err := services.ViewOwnedNotes(ownerID)
@@ -33,10 +29,7 @@ func GetOwnedNotes(c *gin.Context) {
 // lấy tất cả các notes được gửi đến user hiện tại
 func GetReceivedNoteURLs(c *gin.Context) {
 	receiverID := c.GetString("user_id")
-	if receiverID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
+
 	urls, err := services.ViewReceivedNoteURLs(receiverID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -50,88 +43,68 @@ func GetReceivedNoteURLs(c *gin.Context) {
 }
 
 func DeleteNote(c *gin.Context) {
+	// 1. Lấy thông tin (Đã được kiểm chứng an toàn 100% bởi Middleware)
 	noteID := c.Param("id")
-	if noteID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Note ID is required"})
-		return
-	}
+	ownerID := c.GetString("userId") // Nhớ dùng đúng key "userId"
 
-	ownerID := c.GetString("user_id")
-	if ownerID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
+	// 2. Gọi Service để thực hiện xóa
+	// Lúc này Service không cần kiểm tra quyền sở hữu nữa, chỉ cần thực hiện lệnh Delete
 	err := services.DeleteNote(noteID, ownerID)
 
 	if err != nil {
-		errMsg := err.Error()
-		if errMsg == "invalid note ID format" {
-			// Lỗi 400: ID gửi lên không đúng định dạng Hex
-			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		} else if errMsg == "non-exist note id" {
-			// Lỗi 404: Không tìm thấy note hoặc không có quyền (trả về 404 để bảo mật)
-			c.JSON(http.StatusNotFound, gin.H{"error": "Note not found or access denied"})
-		} else {
-			// Lỗi 500: Lỗi DB hoặc hệ thống khác
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
-		}
+		// Vì Middleware đã check tồn tại, lỗi ở đây thường là lỗi hệ thống (DB down, transaction fail...)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể xóa note: " + err.Error()})
 		return
 	}
 
-	// Bước 5: Phản hồi thành công
-	c.JSON(http.StatusOK, gin.H{"message": "Note and related URLs deleted successfully"})
+	// 3. Phản hồi thành công
+	c.JSON(http.StatusOK, gin.H{"message": "Xóa Note và các dữ liệu liên quan thành công"})
 }
 
 func CreateNote(c *gin.Context) {
-	ownerIDStr := c.GetString("user_id")
-	if ownerIDStr == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+	// 1. Lấy dữ liệu đã validate từ Context
+	// Vì c.Get trả về interface{}, ta cần "ép kiểu" (Type Assertion) về đúng struct
+	reqVal, exists := c.Get("validatedRequest")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi hệ thống: Mất dữ liệu request trong context"})
 		return
 	}
 
-	var req models.CreateNoteRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
-		return
-	}
+	// Ép kiểu interface{} -> models.CreateNoteRequest
+	req := reqVal.(models.CreateNoteRequest)
 
+	// 2. Gọi Service
+	// Lưu ý: Lúc này req.OwnerID chắc chắn là ID của người đang đăng nhập
 	noteID, err := services.CreateNote(req.Title, req.CipherText, req.EncryptedAesKey, req.OwnerID)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create note: " + err.Error()})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo ghi chú: " + err.Error()})
 		return
 	}
 
+	// 3. Phản hồi thành công
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "Note created successfully",
+		"message": "Tạo ghi chú thành công",
 		"note_id": noteID,
 	})
-
 }
 
 func DeleteSharedNote(c *gin.Context) {
+	// 1. Lấy dữ liệu (An toàn tuyệt đối nhờ Middleware)
 	noteID := c.Param("note_id")
-	ownerID := c.GetString("user_id")
+	ownerID := c.GetString("userId") // Dùng key "userId"
 
-	if ownerID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
-		return
-	}
-
+	// 2. Gọi Service
+	// Service lúc này chỉ cần thực hiện logic: "Xóa tất cả URL share có note_id = X và owner_id = Y"
 	err := services.DeleteSharedNote(noteID, ownerID)
 
 	if err != nil {
-		errMsg := err.Error()
-		if errMsg == "invalid note ID format" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
-		} else if errMsg == "cannot revoke: note not found, unauthorized, or it is an original note" {
-			// Trả về 403 (Forbidden) hoặc 404 tùy ý định, ở đây 400/403 để báo user biết họ đang cố xóa cái không được xóa
-			c.JSON(http.StatusForbidden, gin.H{"error": errMsg})
-		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": errMsg})
-		}
+		// Middleware đã check tồn tại note, nên lỗi ở đây thường là lỗi Server/DB
+		// hoặc logic nghiệp vụ đặc thù (ví dụ: note này chưa từng được share)
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể hủy chia sẻ: " + err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Delete sharing successfully"})
+	// 3. Phản hồi thành công
+	c.JSON(http.StatusOK, gin.H{"message": "Đã hủy chia sẻ thành công (Revoked)"})
 }

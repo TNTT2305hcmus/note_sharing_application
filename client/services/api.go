@@ -260,3 +260,5 @@ func ReadNoteWithURL(url, token string) (models.NoteData, error) {
 
 	return result, nil
 }
+
+// ------------------------------------Notes-------------------------------------------
