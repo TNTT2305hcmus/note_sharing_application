@@ -8,16 +8,16 @@ type Metadata struct {
 	SharedEncryptedAESKey string `json:"shared_encrypted_aes_key"`
 	ExpiresIn             string `json:"expires_in"` // "1h", "30m"
 	MaxAccess             int    `json:"max_access"` // int (Server yêu cầu số)
-	Receiver              string `json:"receiver_id"`
-	Sender                string `json:"sender_id"`
+	Receiver              string `json:"receiver"`
+	Sender                string `json:"sender"`
 }
 
 // Url đại diện cho thông tin đường dẫn chia sẻ
 type Url struct {
 	ID         string    `json:"url_id"` // Khớp với json tag của ObjectID bên server
 	NoteID     string    `json:"note_id"`
-	SenderID   string    `json:"sender_id"`
-	ReceiverID string    `json:"receiver_id"`
+	SenderID   string    `json:"sender"`
+	ReceiverID string    `json:"receiver"`
 	ExpiresAt  time.Time `json:"expires_at"`
 	MaxAccess  int       `json:"max_access"`
 }
