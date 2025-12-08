@@ -14,7 +14,13 @@ import (
 var DB *mongo.Database
 
 func ConnectDB() {
-	mongoURI := os.Getenv("DB_URL")
+	// Lấy biến môi trường trong .env
+	mongoURI := os.Getenv("MONGO_URI")
+	dbName := os.Getenv("DB_NAME")
+
+	if mongoURI == "" {
+		log.Fatal("Chưa cấu hình MONGO_URI trong file .env")
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -31,13 +37,12 @@ func ConnectDB() {
 	}
 	log.Println("Connected to MongoDB successfully")
 
-	// 1. Gán vào biến global DB
-	DB = client.Database(os.Getenv("DB_NAME"))
+	DB = client.Database(dbName)
 
-	// 2. Lấy đúng collection cần tạo Index ("urls")
+	// Lấy collection cần tạo Index ("urls")
 	urlsCollection := DB.Collection("urls")
 
-	// 3. Gọi hàm tạo Index với đầy đủ tham số
+	// Gọi hàm tạo Index với đầy đủ tham số
 	// Truyền context và collection vào
 	err = models.CreateTTLIndex(context.Background(), urlsCollection)
 	if err != nil {

@@ -39,7 +39,7 @@ func CreateTTLIndex(ctx context.Context, collection *mongo.Collection) error {
 	return err
 }
 
-// 2. Hàm xử lý truy cập (Gọi mỗi khi user xem link)
+// Hàm xử lý truy cập (Gọi mỗi khi user xem link)
 func AccessUrl(ctx context.Context, collection *mongo.Collection, urlID primitive.ObjectID) (*Url, error) {
 	var updatedUrl Url
 

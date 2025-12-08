@@ -136,7 +136,7 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	// 5. Generate JWT token
+	// Generate JWT token
 	// ObjectID -> Hex string
 	tokenString, err := services.GenerateAuthJWT(foundUser.ID.Hex(), foundUser.Username)
 

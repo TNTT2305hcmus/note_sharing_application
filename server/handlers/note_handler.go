@@ -9,7 +9,7 @@ import (
 )
 
 func CreateNote(c *gin.Context) {
-	// 1. Lấy dữ liệu đã validate từ Context
+	// Lấy dữ liệu đã validate từ Context
 	// Vì c.Get trả về interface{}, ta cần "ép kiểu" (Type Assertion) về đúng struct
 	reqVal, exists := c.Get("validatedRequest")
 	if !exists {
@@ -20,7 +20,7 @@ func CreateNote(c *gin.Context) {
 	// Ép kiểu interface{} -> models.CreateNoteRequest
 	req := reqVal.(models.CreateNoteRequest)
 
-	// 2. Gọi Service
+	// Gọi Service
 	// Lưu ý: Lúc này req.OwnerID chắc chắn là ID của người đang đăng nhập
 	ownerID := c.GetString("userId")
 	noteID, err := services.CreateNote(req.CipherText, req.EncryptedAesKey, ownerID)
@@ -30,7 +30,7 @@ func CreateNote(c *gin.Context) {
 		return
 	}
 
-	// 3. Phản hồi thành công
+	// Phản hồi thành công
 	c.JSON(http.StatusCreated, gin.H{
 		"note_id": noteID,
 	})

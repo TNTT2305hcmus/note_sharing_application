@@ -9,6 +9,7 @@ type Metadata struct {
 	ExpiresIn             string `json:"expires_in"` // "1h", "30m"
 	MaxAccess             int    `json:"max_access"` // int (Server yêu cầu số)
 	Receiver              string `json:"receiver_id"`
+	Sender                string `json:"sender_id"`
 }
 
 // Url đại diện cho thông tin đường dẫn chia sẻ
