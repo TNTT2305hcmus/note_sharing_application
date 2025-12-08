@@ -65,5 +65,6 @@ func ViewNoteHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"cipher_text":            note.CipherText,
 		"encrypted_aes_key_by_K": url.SharedEncryptedAESKey,
+		"sender":                 url.Sender,
 	})
 }
