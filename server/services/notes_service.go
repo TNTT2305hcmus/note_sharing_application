@@ -3,9 +3,9 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"note_sharing_application/server/configs"
 	"note_sharing_application/server/models"
-	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -53,13 +53,12 @@ func ViewOwnedNotes(ownerIDStr string) ([]models.Note, error) {
 }
 
 // Servce: xem tất cả urls được gửi đến receiver
-func ViewReceivedNoteURLs(receiverIDStr string) ([]models.Url, error) {
+func ViewReceivedNoteURLs(receiver string) ([]models.Url, error) {
+	fmt.Print(receiver)
 
 	// lọc url
 	urlFilter := bson.M{
-		"receiver_id": receiverIDStr,             // Receiver
-		"expires_at":  bson.M{"$gt": time.Now()}, // Chưa hết hạn
-		"max_access":  bson.M{"$gt": 0},          // Còn lượt truy cập
+		"receiver": receiver, // Receiver
 	}
 
 	// lấy tất cả các urls thỏa mãn lưu vào validUrls
@@ -106,11 +105,11 @@ func DeleteNote(noteIDStr string) error {
 
 }
 
-func DeleteSharedNote(noteIDStr string, ownerIDStr string) error {
+func DeleteSharedNote(noteID string, owner string) error {
 
 	filter := bson.M{
-		"note_id":   noteIDStr,
-		"sender_id": ownerIDStr,
+		"note_id": noteID,
+		"sender":  owner,
 	}
 	result, err := configs.GetCollection("urls").DeleteMany(context.TODO(), filter)
 	if err != nil {

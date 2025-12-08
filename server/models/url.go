@@ -18,16 +18,16 @@ type Url struct {
 	MaxAccess             int                `bson:"max_access" json:"max_access"` // Số lượt truy cập tối đa
 	Accessed              int                `bson:"accessed" json:"accessed"`     // Số lượt đã truy cập
 	SharedEncryptedAESKey string             `bson:"shared_encrypted_aes_key" json:"shared_encrypted_aes_key"`
-	Sender                string             `bson:"sender_id" json:"sender_id"`
-	Receiver              string             `bson:"receiver_id" json:"receiver_id"`
+	Sender                string             `bson:"sender" json:"sender"`
+	Receiver              string             `bson:"receiver" json:"receiver"`
 }
 
 type CreateUrlRequest struct {
 	SharedEncryptedAESKey string `json:"shared_encrypted_aes_key"`
 	ExpiresIn             string `json:"expires_in"` // "1h", "30m"
 	MaxAccess             int    `json:"max_access"` // int (Server yêu cầu số)
-	Sender                string `json:"sender_id"`
-	Receiver              string `json:"receiver_id"`
+	Sender                string `json:"sender"`
+	Receiver              string `json:"receiver"`
 }
 
 func CreateTTLIndex(ctx context.Context, collection *mongo.Collection) error {

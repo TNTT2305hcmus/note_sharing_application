@@ -56,9 +56,9 @@ func GetOwnedNotes(c *gin.Context) {
 
 // lấy tất cả các URLs được gửi đến user hiện tại
 func GetReceivedNoteURLs(c *gin.Context) {
-	receiverID := c.GetString("userId")
+	receiver := c.GetString("username")
 
-	urls, err := services.ViewReceivedNoteURLs(receiverID)
+	urls, err := services.ViewReceivedNoteURLs(receiver)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -72,11 +72,11 @@ func GetReceivedNoteURLs(c *gin.Context) {
 
 func DeleteNote(c *gin.Context) {
 	// 1. Lấy thông tin (Đã được kiểm chứng an toàn 100% bởi Middleware)
-	noteID := c.Param("id")
+	noteId := c.Param("note_id")
 
 	// 2. Gọi Service để thực hiện xóa
 	// Lúc này Service không cần kiểm tra quyền sở hữu nữa, chỉ cần thực hiện lệnh Delete
-	err := services.DeleteNote(noteID)
+	err := services.DeleteNote(noteId)
 
 	if err != nil {
 		// Vì Middleware đã check tồn tại, lỗi ở đây thường là lỗi hệ thống (DB down, transaction fail...)
@@ -91,11 +91,11 @@ func DeleteNote(c *gin.Context) {
 func DeleteSharedNote(c *gin.Context) {
 	// 1. Lấy dữ liệu (An toàn tuyệt đối nhờ Middleware)
 	noteID := c.Param("note_id")
-	ownerID := c.GetString("userId") // Dùng key "userId"
+	owner := c.GetString("username") // Dùng key "userId"
 
 	// 2. Gọi Service
 	// Service lúc này chỉ cần thực hiện logic: "Xóa tất cả URL share có note_id = X và owner_id = Y"
-	err := services.DeleteSharedNote(noteID, ownerID)
+	err := services.DeleteSharedNote(noteID, owner)
 
 	if err != nil {
 		// Middleware đã check tồn tại note, nên lỗi ở đây thường là lỗi Server/DB

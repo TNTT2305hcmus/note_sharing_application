@@ -17,7 +17,7 @@ func ValidateCreateUrl() gin.HandlerFunc {
 		noteId := c.Param("note_id")
 
 		//Qua auth_middleware nên có username trong context chỉ cần lấy ra
-		currentUser := c.GetString("username")
+		currentUser := c.GetString("userId")
 
 		// 1. Kiểm tra Note có tồn tại không
 		var note models.Note

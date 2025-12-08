@@ -86,9 +86,6 @@ func ValidateDeleteNote() gin.HandlerFunc {
 			return
 		}
 
-		// 6. (Tùy chọn) Lưu Note ID dạng ObjectID vào context để Handler dùng luôn nếu cần
-		// c.Set("note_object_id", id)
-
 		c.Next()
 	}
 }
