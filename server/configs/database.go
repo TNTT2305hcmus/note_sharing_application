@@ -14,12 +14,7 @@ import (
 var DB *mongo.Database
 
 func ConnectDB() {
-	// Lấy biến môi trường trong .env
-	mongoURI := os.Getenv("MONGO_URI")
-
-	if mongoURI == "" {
-		log.Fatal("Chưa cấu hình MONGO_URI trong file .env")
-	}
+	mongoURI := os.Getenv("DB_URL")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
