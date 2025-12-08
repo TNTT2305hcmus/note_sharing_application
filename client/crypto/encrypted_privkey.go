@@ -91,7 +91,7 @@ func DecryptByPassword(encryptedHex string, password string) (string, error) {
 
 	plaintext, err := aesGCM.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", errors.New("Error password or wrong data")
+		return "", errors.New("error password or wrong data")
 	}
 
 	return string(plaintext), nil

@@ -45,7 +45,7 @@ func SetupRouter() *gin.Engine {
 				// GET /notes/owned
 				noteRoutes.GET("/owned", middlewares.ValidateGetOwnedNotes(), handlers.GetOwnedNotes)
 
-				// GET /notes/inbox
+				// GET /notes/received
 				noteRoutes.GET("/received", middlewares.ValidateGetReceivedNoteURLs(), handlers.GetReceivedNoteURLs)
 
 				// --- URL SHARING ROUTES (Mới thêm vào) ---

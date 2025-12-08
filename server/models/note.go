@@ -12,8 +12,6 @@ type Note struct {
 }
 
 type CreateNoteRequest struct {
-	Title           string
-	CipherText      string
-	EncryptedAesKey string
-	OwnerID         string
+	CipherText      string `json:"cipher_text"`
+	EncryptedAesKey string `json:"encrypted_aes_key"`
 }

@@ -74,7 +74,7 @@ func ViewReceivedNoteURLs(receiverIDStr string) ([]models.Url, error) {
 	return receivedUrls, nil
 }
 
-func DeleteNote(noteIDStr string, ownerIDStr string) error {
+func DeleteNote(noteIDStr string) error {
 
 	// string --> ObjectID lấy ID của node
 	NoteIDObj, err := primitive.ObjectIDFromHex(noteIDStr)
@@ -84,8 +84,7 @@ func DeleteNote(noteIDStr string, ownerIDStr string) error {
 
 	// lọc note id và người sở hữu
 	filter := bson.M{
-		"_id":      NoteIDObj,
-		"owner_id": ownerIDStr,
+		"_id": NoteIDObj,
 	}
 
 	// Xóa note
@@ -110,8 +109,8 @@ func DeleteNote(noteIDStr string, ownerIDStr string) error {
 func DeleteSharedNote(noteIDStr string, ownerIDStr string) error {
 
 	filter := bson.M{
-		"note_id": noteIDStr,
-		"sender":  ownerIDStr,
+		"note_id":   noteIDStr,
+		"sender_id": ownerIDStr,
 	}
 	result, err := configs.GetCollection("urls").DeleteMany(context.TODO(), filter)
 	if err != nil {

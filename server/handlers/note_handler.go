@@ -8,6 +8,34 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func CreateNote(c *gin.Context) {
+	// 1. Lấy dữ liệu đã validate từ Context
+	// Vì c.Get trả về interface{}, ta cần "ép kiểu" (Type Assertion) về đúng struct
+	reqVal, exists := c.Get("validatedRequest")
+	if !exists {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi hệ thống: Mất dữ liệu request trong context"})
+		return
+	}
+
+	// Ép kiểu interface{} -> models.CreateNoteRequest
+	req := reqVal.(models.CreateNoteRequest)
+
+	// 2. Gọi Service
+	// Lưu ý: Lúc này req.OwnerID chắc chắn là ID của người đang đăng nhập
+	ownerID := c.GetString("userId")
+	noteID, err := services.CreateNote(req.CipherText, req.EncryptedAesKey, ownerID)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo ghi chú: " + err.Error()})
+		return
+	}
+
+	// 3. Phản hồi thành công
+	c.JSON(http.StatusCreated, gin.H{
+		"note_id": noteID,
+	})
+}
+
 // lấy tất cả các notes do user hiện tại tạo
 func GetOwnedNotes(c *gin.Context) {
 	// userID cho khớp với auth_middleware.go
@@ -26,7 +54,7 @@ func GetOwnedNotes(c *gin.Context) {
 	}
 }
 
-// lấy tất cả các notes được gửi đến user hiện tại
+// lấy tất cả các URLs được gửi đến user hiện tại
 func GetReceivedNoteURLs(c *gin.Context) {
 	receiverID := c.GetString("userId")
 
@@ -45,11 +73,10 @@ func GetReceivedNoteURLs(c *gin.Context) {
 func DeleteNote(c *gin.Context) {
 	// 1. Lấy thông tin (Đã được kiểm chứng an toàn 100% bởi Middleware)
 	noteID := c.Param("id")
-	ownerID := c.GetString("userId") // Nhớ dùng đúng key "userId"
 
 	// 2. Gọi Service để thực hiện xóa
 	// Lúc này Service không cần kiểm tra quyền sở hữu nữa, chỉ cần thực hiện lệnh Delete
-	err := services.DeleteNote(noteID, ownerID)
+	err := services.DeleteNote(noteID)
 
 	if err != nil {
 		// Vì Middleware đã check tồn tại, lỗi ở đây thường là lỗi hệ thống (DB down, transaction fail...)
@@ -59,34 +86,6 @@ func DeleteNote(c *gin.Context) {
 
 	// 3. Phản hồi thành công
 	c.JSON(http.StatusOK, gin.H{"message": "Xóa Note và các dữ liệu liên quan thành công"})
-}
-
-func CreateNote(c *gin.Context) {
-	// 1. Lấy dữ liệu đã validate từ Context
-	// Vì c.Get trả về interface{}, ta cần "ép kiểu" (Type Assertion) về đúng struct
-	reqVal, exists := c.Get("validatedRequest")
-	if !exists {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Lỗi hệ thống: Mất dữ liệu request trong context"})
-		return
-	}
-
-	// Ép kiểu interface{} -> models.CreateNoteRequest
-	req := reqVal.(models.CreateNoteRequest)
-
-	// 2. Gọi Service
-	// Lưu ý: Lúc này req.OwnerID chắc chắn là ID của người đang đăng nhập
-	noteID, err := services.CreateNote(req.CipherText, req.EncryptedAesKey, req.OwnerID)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo ghi chú: " + err.Error()})
-		return
-	}
-
-	// 3. Phản hồi thành công
-	c.JSON(http.StatusCreated, gin.H{
-		"message": "Tạo ghi chú thành công",
-		"note_id": noteID,
-	})
 }
 
 func DeleteSharedNote(c *gin.Context) {

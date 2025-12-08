@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"note_sharing_application/server/configs"
 	"note_sharing_application/server/models"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 	"go.mongodb.org/mongo-driver/bson"
@@ -33,7 +32,6 @@ func ValidateGetReceivedNoteURLs() gin.HandlerFunc {
 
 		receiverID := c.GetString("userId")
 		if receiverID == "" {
-
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "Unauthorized: Receiver ID not found in context",
 			})
@@ -46,7 +44,7 @@ func ValidateGetReceivedNoteURLs() gin.HandlerFunc {
 func ValidateDeleteNote() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 1. Lấy Note ID từ URL
-		noteIdHex := c.Param("id")
+		noteIdHex := c.Param("note_id")
 
 		// 2. Validate định dạng ObjectID (Fail Fast)
 		// Nếu ID sai định dạng Hex, chặn ngay lập tức, không cần gọi DB
@@ -111,17 +109,6 @@ func ValidateCreateNote() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Dữ liệu đầu vào không hợp lệ: " + err.Error()})
 			return
 		}
-
-		// 3. Logic nghiệp vụ (Validation chi tiết)
-		// Ví dụ: Tiêu đề không được để trống hoặc quá dài
-		if strings.TrimSpace(req.Title) == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": "Tiêu đề ghi chú không được để trống"})
-			return
-		}
-
-		// 4. BẢO MẬT: Gán OwnerID từ Token vào Request
-		// Dù user có gửi "owner_id": "admin" trong body thì cũng bị ghi đè thành ID của chính họ.
-		req.OwnerID = userID
 
 		// 5. Lưu object đã validate vào Context để Handler dùng
 		// Key này dùng để truyền dữ liệu giữa Middleware và Handler

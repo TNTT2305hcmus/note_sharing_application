@@ -5,6 +5,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -136,5 +137,73 @@ func ConvertStringToBinary(base64String string, outputPath string) error {
 	if err != nil {
 		return err
 	}
+	return nil
+}
+
+// Mã file
+func PrepareFileForUpload(filePath string, password string) (string, string, error) {
+
+	// sinh AES Key ngẫu nhiên (32 bytes)
+	aesKey, err := GenerateAESKey()
+	if err != nil {
+		return "", "", fmt.Errorf("lỗi sinh khóa AES: %v", err)
+	}
+
+	// mã hóa File
+	tempEncryptedPath := filePath + ".enc_temp"
+
+	// đảm bảo xóa file tạm này khi hàm chạy xong
+	defer os.Remove(tempEncryptedPath)
+
+	err = EncryptFile(filePath, tempEncryptedPath, aesKey)
+	if err != nil {
+		return "", "", fmt.Errorf("lỗi mã hóa file: %v", err)
+	}
+
+	// chuyển File đã mã hóa sang Base64
+	cipherTextBase64, err := ConvertBinaryToString(tempEncryptedPath)
+	if err != nil {
+		return "", "", fmt.Errorf("lỗi chuyển đổi file sang base64: %v", err)
+	}
+
+	// mã hóa AES Key bằng Password
+	aesKeyHex := hex.EncodeToString(aesKey)
+
+	encryptedAESKey, err := EncryptByPassword(aesKeyHex, password)
+	if err != nil {
+		return "", "", fmt.Errorf("lỗi mã hóa khóa AES: %v", err)
+	}
+
+	// trả về kết quả
+	return cipherTextBase64, encryptedAESKey, nil
+}
+
+// giải mã file
+// ! AESKey truyền vào phải được giải mã trước đó
+func RestoreFileFromNote(cipherTextBase64, decryptedAESKeyHex, outputFilePath string) error {
+
+	// chuyển đổi AES Key từ base64 string -> byte[]
+	aesKey, err := hex.DecodeString(decryptedAESKeyHex)
+	if err != nil {
+		return fmt.Errorf("lỗi định dạng khóa AES (không phải Hex hợp lệ): %v", err)
+	}
+
+	// chuyển chuỗi Base64 thành File Mã Hóa
+	tempEncryptedPath := outputFilePath + ".enc_temp"
+	defer os.Remove(tempEncryptedPath)
+
+	// base64 String -> byte[]
+	err = ConvertStringToBinary(cipherTextBase64, tempEncryptedPath)
+	if err != nil {
+		return fmt.Errorf("lỗi chuyển đổi Base64 sang file tạm: %v", err)
+	}
+
+	// giải mã
+	err = DecryptedByAESKey(aesKey, tempEncryptedPath, outputFilePath)
+	if err != nil {
+		return fmt.Errorf("lỗi giải mã file (kiểm tra lại Key hoặc độ toàn vẹn file): %v", err)
+	}
+
+	fmt.Println("giải mã thành công")
 	return nil
 }
