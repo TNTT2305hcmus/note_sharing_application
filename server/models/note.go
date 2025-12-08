@@ -10,7 +10,6 @@ type Note struct {
 	CipherText      string             `bson:"cipher_text" json:"cipher_text"`             // Nội dung ghi chú đã mã hóa
 	EncryptedAesKey string             `bson:"encrypted_aes_key" json:"encrypted_aes_key"` // Key giải mã (đã bị bọc)
 	OwnerID         string             `bson:"owner_id" json:"owner_id"`                   // ID của người tạo (dạng string)
-	ReceiverID      string             `bson:"receiver_id" json:"receiver_id"`             // ID của người nhận
 }
 
 type CreateNoteRequest struct {

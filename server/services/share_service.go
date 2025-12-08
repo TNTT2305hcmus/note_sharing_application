@@ -3,6 +3,7 @@ package services
 import (
 	"context"
 	"errors"
+	"fmt"
 	"note_sharing_application/server/configs"
 	"note_sharing_application/server/models"
 	"time"
@@ -13,14 +14,18 @@ import (
 )
 
 // 1. Tạo URL mới
-func CreateUrl(noteId string, expiresIn string, maxAccess int) (string, error) {
+func CreateUrl(noteId, sender, receiver, sharedEncryptedAESKey, expiresIn string, maxAccess int) (string, error) {
 	duration, _ := time.ParseDuration(expiresIn)
 	expireTime := time.Now().Add(duration)
 
 	newUrl := models.Url{
-		NoteID:    noteId,
-		ExpiresAt: expireTime,
-		MaxAccess: maxAccess,
+		NoteID:                noteId,
+		SharedEncryptedAESKey: sharedEncryptedAESKey,
+		ExpiresAt:             expireTime,
+		MaxAccess:             maxAccess,
+		Accessed:              0,
+		Sender:                sender,
+		Receiver:              receiver,
 	}
 
 	res, err := configs.GetCollection("urls").InsertOne(context.TODO(), newUrl)
@@ -32,13 +37,12 @@ func CreateUrl(noteId string, expiresIn string, maxAccess int) (string, error) {
 }
 
 // 2. Lấy URL đang tồn tại của Note
-func GetExistingUrl(noteID string) (string, error) {
+func GetExistingUrl(noteId, receiver string) (string, error) {
 	var url models.Url
 	// Tìm url của note này mà còn hạn và còn lượt xem
 	filter := bson.M{
-		"note_id":    noteID,
-		"exp":        bson.M{"$gt": time.Now()}, // Còn hạn
-		"max_access": bson.M{"$gt": 0},          // Còn lượt
+		"note_id":  noteId,
+		"receiver": receiver,
 	}
 
 	err := configs.GetCollection("urls").FindOne(context.TODO(), filter).Decode(&url)
@@ -49,33 +53,35 @@ func GetExistingUrl(noteID string) (string, error) {
 	return url.ID.Hex(), nil
 }
 
-// 3. Xử lý xem Note (Check URL, Check quyền, Trả về nội dung)
-func GetNote(url models.Url) (*models.Note, error) {
-	urlId := url.ID.Hex()
+// 3. Xử lý xem Note
+func GetNote(reqUrl models.Url) (models.Note, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
 
-	filter := bson.M{
-		"_id":        urlId,
-		"max_access": bson.M{"$gt": 0},
+	urlColl := configs.GetCollection("urls")
+	noteColl := configs.GetCollection("notes")
+
+	// B. Gọi hàm AccessUrl (Logic tăng view và tự xóa nằm ở đây)
+	// Lưu ý: Truyền reqUrl.ID (kiểu ObjectID) vào thẳng, không cần convert từ string
+	validUrl, err := models.AccessUrl(ctx, urlColl, reqUrl.ID)
+	if err != nil {
+		return models.Note{}, fmt.Errorf("không thể truy cập link này: %v", err)
 	}
 
-	update := bson.M{"$inc": bson.M{"max_access": -1}}
-
-	coll := configs.GetCollection("urls")
-	err := coll.FindOneAndUpdate(context.TODO(), filter, update).Decode(&url)
+	// Lấy Note gốc dựa trên NoteID lưu trong Url
+	// Vì trong struct Url, NoteID là string, cần convert sang ObjectID để query
+	noteOID, err := primitive.ObjectIDFromHex(validUrl.NoteID)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, errors.New("URL đã hết hạn hoặc hết lượt truy cập")
-		}
-		return nil, err
+		return models.Note{}, fmt.Errorf("Note ID trong dữ liệu bị lỗi")
 	}
 
 	var note models.Note
-	noteId, _ := primitive.ObjectIDFromHex(url.NoteID)
-
-	err = configs.GetCollection("notes").FindOne(context.TODO(), bson.M{"_id": noteId}).Decode(&note)
+	err = noteColl.FindOne(ctx, bson.M{"_id": noteOID}).Decode(&note)
 	if err != nil {
-		return nil, errors.New("note gốc đã bị xóa")
+		if err == mongo.ErrNoDocuments {
+			return models.Note{}, fmt.Errorf("note gốc đã bị xóa khỏi hệ thống")
+		}
+		return models.Note{}, err
 	}
-
-	return &note, nil
+	return note, nil
 }

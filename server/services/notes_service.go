@@ -119,7 +119,6 @@ func CreateNote(title string, cipherText string, encryptedAesKey string, ownerID
 		CipherText:      cipherText,
 		EncryptedAesKey: encryptedAesKey,
 		OwnerID:         ownerIDStr,
-		ReceiverID:      "",
 	}
 
 	result, err := configs.GetCollection("notes").InsertOne(context.TODO(), newNote)

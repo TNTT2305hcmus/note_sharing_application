@@ -144,12 +144,14 @@ func GetUserPublicKey(targetUsername string) (string, error) {
 }
 
 // ---------------------URL------------------------------------------------------
-func CreateNoteUrl(noteId, token, expiresIn string, maxAccess int) (string, error) {
+func CreateNoteUrl(noteId, token, sharedEncryptedAESKey, expiresIn, receiver string, maxAccess int) (string, error) {
 
 	// Chuẩn bị dữ liệu (Marshal JSON)
 	reqBody := models.Metadata{
-		ExpiresIn: expiresIn,
-		MaxAccess: maxAccess,
+		SharedEncryptedAESKey: sharedEncryptedAESKey,
+		ExpiresIn:             expiresIn,
+		MaxAccess:             maxAccess,
+		Receiver:              receiver,
 	}
 
 	jsonBody, err := json.Marshal(reqBody)
