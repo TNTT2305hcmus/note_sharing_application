@@ -32,6 +32,7 @@ func printHelp() {
 	fmt.Println("6. Gửi file (Chia sẻ):              go run main.go send -note <id> -t <receiver> [-exp 1h] [-max 1] -u <current username>")
 	fmt.Println("7. Xóa file gốc:                    go run main.go deleteFile -id <id> -u <current username>")
 	fmt.Println("8. Hủy chia sẻ:                     go run main.go cancelSharingURL -id <id> -u <current username>")
+	fmt.Println("9. Đọc ghi chú được chia sẻ:        go run main.go readSharedNote -id <url_id> -sender <sender_name> -u <current username> -o <output_file>")
 }
 
 func main() {
@@ -100,6 +101,18 @@ func main() {
 		user := cmd.String("u", "", "Current username")
 		cmd.Parse(os.Args[2:])
 		handleCancelSharing(*noteID, *user)
+
+	case "readSharedNote":
+		// Cú pháp: readSharedNote -id <url_id> -sender <sender> -o <path> -u <me>
+		cmd := flag.NewFlagSet("readSharedNote", flag.ExitOnError)
+
+		urlID := cmd.String("id", "", "ID của URL chia sẻ (Lấy từ listSharedFile)")
+		sender := cmd.String("sender", "", "Username người gửi (Lấy từ listSharedFile)")
+		outFile := cmd.String("o", "", "Đường dẫn file để lưu kết quả giải mã")
+		user := cmd.String("u", "", "Username của bạn")
+
+		cmd.Parse(os.Args[2:])
+		handleReadSharedNote(*urlID, *sender, *outFile, *user)
 
 	default:
 		printHelp()
@@ -262,7 +275,6 @@ func handleSaveFile(filePath, username string) {
 	fmt.Printf("Lưu thành công! Note ID: %s\n", noteID)
 }
 
-// 4. Gửi file (Chia sẻ)
 // Logic:
 // B1. Lấy EncryptedAESKeyByPass của Note  -> Giải mã bằng Pass.
 // B2. Lấy PubKey của Receiver -> Tính Shared Secret K (Diffie-Hellman).
@@ -404,6 +416,84 @@ func handleCancelSharing(noteID, username string) {
 		return
 	}
 	fmt.Println("Đã hủy chia sẻ ghi chú này.")
+}
+
+// Logic:
+// B1. Tải CipherText và EncryptedKey (bọc bởi K) từ Server.
+// B2. Lấy PubKey của Sender -> Tính Shared Secret K.
+// B3. Dùng K giải mã lấy AES Key gốc.
+// B4. Dùng AES Key giải mã CipherText -> Ghi ra file.
+func handleReadSharedNote(urlID, sender, outFile, username string) {
+	// 1. Kiểm tra đầu vào
+	if urlID == "" || sender == "" || outFile == "" || username == "" {
+		fmt.Println("Thiếu thông tin. Cần: -id <url_id> -sender <name> -o <path> -u <me>")
+		return
+	}
+
+	session, err := loadSession(username)
+	if err != nil {
+		fmt.Println("Lỗi session:", err)
+		return
+	}
+
+	// Nhập mật khẩu để giải mã EncryptedPrivKey
+	password := promptPassword("Nhập mật khẩu của BẠN để giải mã: ")
+
+	// Gọi API lấy ciphertext
+	fmt.Println("Đang tải dữ liệu từ server...")
+	noteData, err := services.ReadNoteWithURL(urlID, session.Token)
+	if err != nil {
+		fmt.Printf("Lỗi tải dữ liệu: %v\n", err)
+		return
+	}
+
+	// Diffie-Hellman
+	fmt.Println("Đang tính toán khóa chung (Shared Secret)...")
+
+	// Giải mã Private Key
+	myPrivKeyHex, err := crypto.DecryptByPassword(session.EncryptedPrivateKey, password)
+	if err != nil {
+		fmt.Println("Sai mật khẩu hoặc lỗi Private Key:", err)
+		return
+	}
+	myPrivKeyBig := new(big.Int)
+	myPrivKeyBig.SetString(myPrivKeyHex, 16)
+
+	// Lấy Public Key của Sender
+	senderPubKeyHex, err := services.GetUserPublicKey(sender)
+	if err != nil {
+		fmt.Printf("Lỗi lấy Public Key của %s: %v\n", sender, err)
+		return
+	}
+
+	// Tính K
+	sharedK, err := crypto.ComputeSharedSecret(myPrivKeyBig, senderPubKeyHex)
+	if err != nil {
+		fmt.Println("Lỗi tính toán Diffie-Hellman:", err)
+		return
+	}
+
+	// Giải mã AES Key bằng K
+	fmt.Println("Đang giải mã khóa AES...")
+	aesKeyBytes, err := crypto.DecryptAESKeyWithSharedK(noteData.EncryptedKey, sharedK)
+	if err != nil {
+		fmt.Println("Giải mã khóa thất bại (Có thể sai Sender hoặc Token bị lỗi):", err)
+		return
+	}
+
+	// Giải mã nội dung file bằng AES Key vừa tìm được
+	fmt.Println("Đang giải mã nội dung ghi chú...")
+
+	// Chuyển lại AES Key sang Hex string để tái sử dụng hàm RestoreFileFromNote cũ
+	aesKeyHex := hex.EncodeToString(aesKeyBytes)
+
+	err = crypto.RestoreFileFromNote(noteData.EncryptedContent, aesKeyHex, outFile)
+	if err != nil {
+		fmt.Println("Lỗi giải mã file:", err)
+		return
+	}
+
+	fmt.Printf("Đã giải mã thành công!\nNội dung được lưu tại: %s\n", outFile)
 }
 
 // --- HÀM PHỤ TRỢ (Session) ---
