@@ -56,13 +56,8 @@ func SetupRouter() *gin.Engine {
 
 				//Nếu muốn xem thì cần tìm 1 url sẵn trước thì mới được truy cập
 				noteRoutes.GET("/:note_id/url", middlewares.ValidateUrlAccess(), handlers.GetNoteUrl)
-
-				//API xóa ghi chú, hủy chia sẻ viết ở đây
-
-				// GET /notes/url_id
-				noteRoutes.GET("/view/:url_id", handlers.ViewNoteHandler)
 			}
-			api.GET("/note/:url_id", middlewares.AuthMiddleware(), middlewares.ValidateUrlAccess(), middlewares.ValidateUrl(), handlers.ViewNoteHandler)
+			api.GET("/note/:url_id", middlewares.ValidateUrlAccess(), middlewares.ValidateUrl(), handlers.ViewNoteHandler)
 		}
 	}
 	return r

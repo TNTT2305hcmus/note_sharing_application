@@ -12,11 +12,14 @@ import (
 // Tạo URL (POST /api/:note_id/url)
 func CreateNoteUrl(c *gin.Context) {
 	noteId := c.Param("note_id")
+	sender := c.GetString("username")
+	receiver := c.GetString("receiver")
 	expiresIn := c.GetString("expires_in")
 	maxAccess := c.GetInt("max_access")
+	sharedEncryptedAESKey := c.GetString("shared_encrypted_aes_key")
 
 	// Gọi Service tạo đối tượng trong DB
-	urlId, err := services.CreateUrl(noteId, expiresIn, maxAccess)
+	urlId, err := services.CreateUrl(noteId, sender, receiver, sharedEncryptedAESKey, expiresIn, maxAccess)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -24,16 +27,16 @@ func CreateNoteUrl(c *gin.Context) {
 	}
 
 	// Trả về đường dẫn
-	finalUrl := fmt.Sprintf("localhost:8080/view/%s", urlId)
+	finalUrl := fmt.Sprintf("localhost:8080/note/%s", urlId)
 	c.JSON(http.StatusOK, gin.H{"url": finalUrl})
 }
 
 // GET /api/:note_id/url
 func GetNoteUrl(c *gin.Context) {
 	noteId := c.Param("note_id")
-
+	receiver := c.GetString("username")
 	// Gọi Service xem DB có URL nào không
-	urlId, err := services.GetExistingUrl(noteId)
+	urlId, err := services.GetExistingUrl(noteId, receiver)
 
 	if err != nil {
 		// Không có thì gửi message báo lỗi
@@ -60,7 +63,8 @@ func ViewNoteHandler(c *gin.Context) {
 
 	// Trả về {cipher_text, encrypted_aes_key}
 	c.JSON(http.StatusOK, gin.H{
-		"cipher_text":       note.CipherText,
-		"encrypted_aes_key": note.EncryptedAesKey,
+		"cipher_text":            note.CipherText,
+		"encrypted_aes_key_by_K": url.SharedEncryptedAESKey,
+		"sender":                 url.Sender,
 	})
 }

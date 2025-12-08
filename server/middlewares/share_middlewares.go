@@ -16,6 +16,7 @@ func ValidateCreateUrl() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		noteId := c.Param("note_id")
 
+		//Qua auth_middleware nên có username trong context chỉ cần lấy ra
 		currentUser := c.GetString("username")
 
 		// 1. Kiểm tra Note có tồn tại không
@@ -56,6 +57,8 @@ func ValidateCreateUrl() gin.HandlerFunc {
 		// Lưu thông tin đã parse vào Context để Handler dùng
 		c.Set("expires_in", req.ExpiresIn)
 		c.Set("max_access", req.MaxAccess)
+		c.Set("shared_encrypted_aes_key", req.SharedEncryptedAESKey)
+		c.Set("receiver", req.Receiver)
 
 		c.Next()
 	}
@@ -65,22 +68,17 @@ func ValidateCreateUrl() gin.HandlerFunc {
 func ValidateUrlAccess() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		noteId := c.Param("note_id")
-		currentUser := c.GetString("username")
 
 		var note models.Note
 		id, _ := primitive.ObjectIDFromHex(noteId)
-		coll := configs.GetCollection("notes")
-		err := coll.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&note)
+		noteColl := configs.GetCollection("notes")
+		err := noteColl.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&note)
 
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Note không tồn tại"})
 			return
 		}
 
-		if note.OwnerID != currentUser || note.ReceiverID != currentUser {
-			c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "Yêu cầu không hợp lệ"})
-			return
-		}
 		c.Next()
 	}
 }
@@ -99,7 +97,7 @@ func ValidateUrl() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Liên kết sai hoặc đã hết hạn"})
 			return
 		}
-		c.Set("note_id", url.NoteID)
+		c.Set("url", url)
 		c.Next()
 	}
 }
