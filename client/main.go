@@ -92,7 +92,7 @@ func handleRegister(user, pass string) {
 	fmt.Printf("Public Key sinh ra: %s...\n", pubKeyHex[:10])
 
 	fmt.Println("Đang mã hóa Private Key bằng Password...")
-	encryptedPrivKey, err := crypto.EncryptPrivateKeyWithPassword(privKeyHex, pass)
+	encryptedPrivKey, err := crypto.EncryptByPassword(privKeyHex, pass)
 	if err != nil {
 		fmt.Println("Lỗi mã hóa Private Key:", err)
 		return
@@ -162,7 +162,7 @@ func handleConnect(currentUser, targetUser string) {
 
 	fmt.Println("Đang giải mã Private Key trong bộ nhớ tạm...")
 	// Giải mã từ chuỗi Encrypted lưu trong file session
-	privKeyHex, err := crypto.DecryptPrivateKeyWithPassword(session.EncryptedPrivateKey, password)
+	privKeyHex, err := crypto.DecryptByPassword(session.EncryptedPrivateKey, password)
 	if err != nil {
 		fmt.Println("Sai mật khẩu! Không thể giải mã khóa.", err)
 		return

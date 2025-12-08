@@ -21,7 +21,7 @@ func DeriveKeyFromPassword(password string, salt []byte) []byte {
 
 // Hàm mã hóa Private Key bằng Password
 // Output format: Salt (16 bytes) + Nonce (12 bytes) + CipherText
-func EncryptPrivateKeyWithPassword(privKeyHex string, password string) (string, error) {
+func EncryptByPassword(privKeyHex string, password string) (string, error) {
 	// Tạo Salt ngẫu nhiên cho việc dẫn xuất khóa
 	salt := make([]byte, 16)
 	if _, err := io.ReadFull(rand.Reader, salt); err != nil {
@@ -60,7 +60,7 @@ func EncryptPrivateKeyWithPassword(privKeyHex string, password string) (string, 
 }
 
 // 3. Hàm giải mã Private Key khi đăng nhập
-func DecryptPrivateKeyWithPassword(encryptedHex string, password string) (string, error) {
+func DecryptByPassword(encryptedHex string, password string) (string, error) {
 	data, err := hex.DecodeString(encryptedHex)
 	if err != nil {
 		return "", err

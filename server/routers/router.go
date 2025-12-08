@@ -16,9 +16,13 @@ func SetupRouter() *gin.Engine {
 		// group xác thực
 		auth := api.Group("/auth")
 		{
+			// API yêu cầu đăng ký
 			auth.POST("/register", handlers.RegisterHandler)
+			// API yêu cầu đăng nhập
 			auth.POST("/login", handlers.LoginHandler)
+			// API yêu cầu lấy pubKey RSA của server
 			auth.GET("/server-public-key-rsa", handlers.GetServerPublicKeyRSA)
+			// API yêu cầu lấy pubKey của client khác
 			auth.GET("/users/:username/pubkey", handlers.GetUserPublicKey)
 		}
 
@@ -46,7 +50,7 @@ func SetupRouter() *gin.Engine {
 
 				// --- URL SHARING ROUTES (Mới thêm vào) ---
 
-				// 1. Tạo URL chia sẻ cho một Note cụ thể
+				// Tạo URL chia sẻ cho một Note cụ thể
 				// Có thêm middleware: ValidateCreateUrl (check chủ sở hữu, check metadata)
 				noteRoutes.POST("/:note_id/url", middlewares.ValidateCreateUrl(), handlers.CreateNoteUrl)
 

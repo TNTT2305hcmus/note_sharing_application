@@ -5,6 +5,7 @@ import (
 	"log"
 	"note_sharing_application/server/models"
 	"os"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -13,13 +14,25 @@ import (
 var DB *mongo.Database
 
 func ConnectDB() {
-	client, err := mongo.Connect(context.TODO(), options.Client().ApplyURI(os.Getenv("CONNECTION_STRING")))
-	if err != nil {
-		log.Fatal(err)
+	// Lấy biến môi trường trong .env
+	mongoURI := os.Getenv("MONGO_URI")
+
+	if mongoURI == "" {
+		log.Fatal("Chưa cấu hình MONGO_URI trong file .env")
 	}
 
-	if err := client.Ping(context.TODO(), nil); err != nil {
-		log.Fatal("Error pinging MongoDB: ", err)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	// Kết nối đến db
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		log.Fatal("Lỗi khởi tạo client Mongo:", err)
+	}
+
+	// ping check
+	if err := client.Ping(ctx, nil); err != nil {
+		log.Fatal("Không thể ping tới MongoDB:", err)
 	}
 	log.Println("Connected to MongoDB successfully")
 
@@ -41,5 +54,8 @@ func ConnectDB() {
 }
 
 func GetCollection(name string) *mongo.Collection {
+	if DB == nil {
+		log.Fatal("Database chưa được khởi tạo.")
+	}
 	return DB.Collection(name)
 }

@@ -11,7 +11,7 @@ import (
 // lấy tất cả các notes do user hiện tại tạo
 func GetOwnedNotes(c *gin.Context) {
 	// userID cho khớp với auth_middleware.go
-	ownerID := c.GetString("user_id")
+	ownerID := c.GetString("userId")
 
 	// gọi service và gửi kết quả cho client
 	notes, err := services.ViewOwnedNotes(ownerID)
@@ -28,7 +28,7 @@ func GetOwnedNotes(c *gin.Context) {
 
 // lấy tất cả các notes được gửi đến user hiện tại
 func GetReceivedNoteURLs(c *gin.Context) {
-	receiverID := c.GetString("user_id")
+	receiverID := c.GetString("userId")
 
 	urls, err := services.ViewReceivedNoteURLs(receiverID)
 	if err != nil {
@@ -75,7 +75,7 @@ func CreateNote(c *gin.Context) {
 
 	// 2. Gọi Service
 	// Lưu ý: Lúc này req.OwnerID chắc chắn là ID của người đang đăng nhập
-	noteID, err := services.CreateNote(req.Title, req.CipherText, req.EncryptedAesKey, req.OwnerID)
+	noteID, err := services.CreateNote(req.CipherText, req.EncryptedAesKey, req.OwnerID)
 
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Không thể tạo ghi chú: " + err.Error()})
