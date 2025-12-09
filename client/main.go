@@ -424,7 +424,7 @@ func handleCancelSharing(noteID, username string) {
 // B3. Dùng K giải mã lấy AES Key gốc.
 // B4. Dùng AES Key giải mã CipherText -> Ghi ra file.
 func handleReadSharedNote(urlID, sender, outFile, username string) {
-	// 1. Kiểm tra đầu vào
+	// Kiểm tra đầu vào
 	if urlID == "" || sender == "" || outFile == "" || username == "" {
 		fmt.Println("Thiếu thông tin. Cần: -id <url_id> -sender <name> -o <path> -u <me>")
 		return

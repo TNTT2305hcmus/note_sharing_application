@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -206,4 +207,66 @@ func RestoreFileFromNote(cipherTextBase64, decryptedAESKeyHex, outputFilePath st
 
 	fmt.Println("giải mã thành công")
 	return nil
+}
+
+// Hỗ trợ test AES trên RAM
+
+// Xử lý mã hóa và giải mã AES-GCM tối ưu trên RAM
+// EncryptBytes mã hóa mảng byte bằng AES-GCM
+// Output: [Nonce (12 bytes)] + [Ciphertext]
+func EncryptBytes(plaintext []byte, key []byte) ([]byte, error) {
+	// Tạo Block Cipher từ Key
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tạo GCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tạo Nonce ngẫu nhiên (Standard 12 bytes)
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+
+	// Mã hóa (Seal)
+	// Kết quả = [Nonce] + [Ciphertext]
+	ciphertext := aesGCM.Seal(nonce, nonce, plaintext, nil)
+
+	return ciphertext, nil
+}
+
+// DecryptBytes giải mã mảng byte bằng AES-GCM
+// Input: [Nonce (12 bytes)] + [Ciphertext]
+func DecryptBytes(ciphertext []byte, key []byte) ([]byte, error) {
+	// Tạo Block Cipher
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tạo GCM
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+
+	// Tách Nonce và Ciphertext thật
+	nonceSize := aesGCM.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("dữ liệu quá ngắn, không đúng định dạng AES-GCM")
+	}
+	nonce, actualCiphertext := ciphertext[:nonceSize], ciphertext[nonceSize:]
+
+	// Giải mã (Open)
+	plaintext, err := aesGCM.Open(nil, nonce, actualCiphertext, nil)
+	if err != nil {
+		return nil, errors.New("giải mã thất bại (sai khóa hoặc dữ liệu bị sửa đổi)")
+	}
+
+	return plaintext, nil
 }
