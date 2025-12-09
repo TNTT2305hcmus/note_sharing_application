@@ -36,7 +36,7 @@ func AuthMiddleware() gin.HandlerFunc {
 		}
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Định dạng Token sai (phải là Bearer <token>)"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Định dạng xác thực sai"})
 			c.Abort()
 			return
 		}

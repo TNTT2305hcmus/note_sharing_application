@@ -87,6 +87,7 @@ func ValidateNote() gin.HandlerFunc {
 func ValidateUrl() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		urlId := c.Param("url_id")
+		receiver := c.GetString("username")
 
 		var url models.Url
 		id, _ := primitive.ObjectIDFromHex(urlId)
@@ -95,6 +96,11 @@ func ValidateUrl() gin.HandlerFunc {
 
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Liên kết sai hoặc đã hết hạn"})
+			return
+		}
+
+		if receiver != url.Receiver {
+			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Yêu cầu không hợp lệ"})
 			return
 		}
 		c.Set("url", url)

@@ -57,7 +57,7 @@ func ViewNoteHandler(c *gin.Context) {
 	note, err := services.GetNote(url)
 
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
 	}
 
