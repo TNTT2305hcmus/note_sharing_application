@@ -57,7 +57,7 @@ func SetupRouter() *gin.Engine {
 				//Nếu muốn xem thì cần tìm 1 url sẵn trước thì mới được truy cập
 				noteRoutes.GET("/:note_id/url", middlewares.ValidateNote(), handlers.GetNoteUrl)
 			}
-			api.GET("/note/:url_id", middlewares.ValidateUrl(), handlers.ViewNoteHandler)
+			protected.GET("/note/:url_id", middlewares.ValidateUrl(), handlers.ViewNoteHandler)
 		}
 	}
 	return r
