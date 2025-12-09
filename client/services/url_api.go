@@ -95,7 +95,7 @@ func ReadNoteWithURL(urlId, token string) (models.NoteData, error) {
 	var result models.NoteData
 
 	// Lưu ý: urlId ở đây là ID của URL chia sẻ (ObjectID hex)
-	url := fmt.Sprintf("%s/notes/%s", BaseURL, urlId)
+	url := fmt.Sprintf("%s/note/%s", BaseURL, urlId)
 
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Set("Authorization", "Bearer "+token)

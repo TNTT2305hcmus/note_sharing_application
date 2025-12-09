@@ -65,7 +65,7 @@ func ValidateCreateUrl() gin.HandlerFunc {
 }
 
 // Kiểm tra quyền truy cập có được lấy url hay không
-func ValidateUrlAccess() gin.HandlerFunc {
+func ValidateNote() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		noteId := c.Param("note_id")
 
@@ -90,7 +90,7 @@ func ValidateUrl() gin.HandlerFunc {
 
 		var url models.Url
 		id, _ := primitive.ObjectIDFromHex(urlId)
-		coll := configs.GetCollection("notes")
+		coll := configs.GetCollection("urls")
 		err := coll.FindOne(context.TODO(), bson.M{"_id": id}).Decode(&url)
 
 		if err != nil {
