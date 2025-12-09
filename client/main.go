@@ -475,6 +475,7 @@ func handleReadSharedNote(urlID, sender, outFile, username string) {
 
 	// Giải mã AES Key bằng K
 	fmt.Println("Đang giải mã khóa AES...")
+	fmt.Println(sender)
 	aesKeyBytes, err := crypto.DecryptAESKeyWithSharedK(noteData.EncryptedKey, sharedK)
 	if err != nil {
 		fmt.Println("Giải mã khóa thất bại (Có thể sai Sender hoặc Token bị lỗi):", err)

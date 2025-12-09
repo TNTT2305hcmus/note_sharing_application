@@ -8,6 +8,7 @@ type Note struct {
 }
 
 type NoteData struct {
-	EncryptedContent string `json:"cipher_text"` 
-	EncryptedKey     string `json:"encrypted_aes_key"`
+	EncryptedContent string `json:"cipher_text"`
+	EncryptedKey     string `json:"encrypted_aes_key_by_K"`
+	Sender           string `json:"sender"`
 }
