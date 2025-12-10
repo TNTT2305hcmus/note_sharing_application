@@ -37,16 +37,16 @@ var router *gin.Engine
 var testDB *mongo.Database
 
 // Struct giả lập response từ server để test độc lập
-// Đã cập nhật để bắt mọi trường hợp tên field JSON có thể xảy ra
 type TestNoteResponse struct {
 	EncryptedContent string `json:"cipher_text"`
-
-	// Server có thể trả về một trong các tên sau, ta khai báo hết để hứng
-	KeyOption1 string `json:"encrypted_aes_key"`
-	KeyOption2 string `json:"shared_encrypted_aes_key"`
-	KeyOption3 string `json:"encrypted_aes_key_by_K"` // Field thường dùng trong Client Model của bạn
+	KeyOption1       string `json:"encrypted_aes_key"`
+	KeyOption2       string `json:"shared_encrypted_aes_key"`
+	KeyOption3       string `json:"encrypted_aes_key_by_K"`
 }
 
+// --- TESTS ---
+
+// Chạy trước và sau toàn bộ test
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -70,6 +70,7 @@ func TestMain(m *testing.M) {
 	os.Exit(exitVal)
 }
 
+// Test toàn bộ flow chia sẻ ghi chú giữa 2 user
 func TestEndToEndSharingFlow(t *testing.T) {
 	// 1. Setup Data
 	alice, bob, password := "alice_clean", "bob_clean", "Pass123"
@@ -150,17 +151,19 @@ func TestEndToEndSharingFlow(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, noteContent, string(decryptedContent))
 
-	fmt.Printf("\n✅ SUCCESS: '%s' == '%s'\n", noteContent, string(decryptedContent))
+	fmt.Printf("\nSUCCESS: '%s' == '%s'\n", noteContent, string(decryptedContent))
 }
 
 // --- HELPERS ---
 
+// Mã hóa password bằng RSA Public Key của Server
 func encryptPass(raw string) string {
 	rng := rand.Reader
 	enc, _ := rsa.EncryptOAEP(sha256.New(), rng, utils.ServerPublicKey, []byte(raw), []byte(""))
 	return base64.StdEncoding.EncodeToString(enc)
 }
 
+// Đăng ký user, trả về Private Key, Public Key và Public Key Hex
 func registerUser(t *testing.T, user, pass string) (*big.Int, *big.Int, string) {
 	priv, pub, _ := crypto.GenerateKeyPair()
 	privHex, pubHex := priv.Text(16), pub.Text(16)
@@ -178,6 +181,7 @@ func registerUser(t *testing.T, user, pass string) (*big.Int, *big.Int, string) 
 	return priv, pub, pubHex
 }
 
+// Đăng nhập user, trả về Token và Encrypted Private Key
 func loginUser(t *testing.T, user, pass string) (string, string) {
 	body, _ := json.Marshal(map[string]string{
 		"username": user, "password": encryptPass(pass),
@@ -192,6 +196,7 @@ func loginUser(t *testing.T, user, pass string) (string, string) {
 	return res["token"].(string), res["encrypted_privKey"].(string)
 }
 
+// Tạo Note Request
 func createNoteRequest(t *testing.T, token, cipher, encKey string) string {
 	body, _ := json.Marshal(models.CreateNoteRequest{
 		CipherText: cipher, EncryptedAesKey: encKey,
@@ -207,6 +212,7 @@ func createNoteRequest(t *testing.T, token, cipher, encKey string) string {
 	return res["note_id"]
 }
 
+// Chia sẻ Note Request
 func shareNoteRequest(t *testing.T, token, noteID string, body models.CreateUrlRequest) string {
 	jsonVal, _ := json.Marshal(body)
 	w := httptest.NewRecorder()
@@ -217,6 +223,7 @@ func shareNoteRequest(t *testing.T, token, noteID string, body models.CreateUrlR
 	return ""
 }
 
+// Lấy danh sách URL được share đến user
 func getReceivedUrlsRequest(t *testing.T, token string) []models.Url {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/notes/received", nil)
@@ -228,6 +235,7 @@ func getReceivedUrlsRequest(t *testing.T, token string) []models.Url {
 	return urls
 }
 
+// Lấy Public Key của user
 func getPubKeyRequest(t *testing.T, user string) string {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/auth/users/"+user+"/pubkey", nil)
@@ -237,16 +245,13 @@ func getPubKeyRequest(t *testing.T, user string) string {
 	return res["public_key"]
 }
 
+// Xem chi tiết Note qua URL
 func viewNoteRequest(t *testing.T, token, urlID string) TestNoteResponse {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/note/"+urlID, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
 	router.ServeHTTP(w, req)
 	assert.Equal(t, 200, w.Code)
-
-	// DEBUG: In ra body thực tế nếu muốn kiểm tra
-	// fmt.Println("DEBUG RESPONSE BODY:", w.Body.String())
-
 	var note TestNoteResponse
 	_ = json.Unmarshal(w.Body.Bytes(), &note)
 	return note
