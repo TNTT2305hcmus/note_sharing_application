@@ -103,7 +103,6 @@ func ValidateUrl() gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "Yêu cầu không hợp lệ"})
 			return
 		}
-
 		c.Set("url", url)
 		c.Next()
 	}
