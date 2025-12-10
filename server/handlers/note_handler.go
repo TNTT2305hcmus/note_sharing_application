@@ -66,7 +66,19 @@ func GetReceivedNoteURLs(c *gin.Context) {
 	if urls == nil {
 		c.JSON(http.StatusOK, []interface{}{})
 	} else {
-		c.JSON(http.StatusOK, urls)
+		res := []models.UrlResponse{}
+
+		for _, url := range urls {
+			var item models.UrlResponse
+			item.ID = "localhost:8080/note/" + url.ID.Hex()
+			item.NoteID = url.NoteID
+			item.SenderID = url.Sender
+			item.ReceiverID = url.Receiver
+			item.ExpiresAt = url.ExpiresAt
+			item.MaxAccess = url.MaxAccess
+			res = append(res, item)
+		}
+		c.JSON(http.StatusOK, res)
 	}
 }
 

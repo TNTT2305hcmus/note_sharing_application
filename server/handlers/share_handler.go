@@ -25,10 +25,10 @@ func CreateNoteUrl(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-
 	// Trả về đường dẫn
 	finalUrl := fmt.Sprintf("localhost:8080/note/%s", urlId)
-	c.JSON(http.StatusOK, gin.H{"url": finalUrl})
+	fmt.Printf("Tạo URL cho ghi chú %s thành công: %s", noteId, finalUrl)
+	c.JSON(http.StatusOK, gin.H{"message": "Tạo URL chia sẻ thành công"})
 }
 
 // GET /api/:note_id/url

@@ -35,7 +35,7 @@ func getSecretKey() []byte {
 // Tạo access token xác thực khi đăng nhập thành công
 func GenerateAuthJWT(userID, username string) (string, error) {
 	//Quy định thời gian hết hạn của token
-	expirationTime := time.Now().Add(1 * time.Hour)
+	expirationTime := time.Now().Add(15 * time.Minute)
 
 	//Ghi nội dung cho claims
 	claims := &authClaims{

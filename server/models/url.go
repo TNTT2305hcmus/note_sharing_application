@@ -30,6 +30,15 @@ type CreateUrlRequest struct {
 	Receiver              string `json:"receiver"`
 }
 
+type UrlResponse struct {
+	ID         string    `json:"url_id"` // Khớp với json tag của ObjectID bên server
+	NoteID     string    `json:"note_id"`
+	SenderID   string    `json:"sender"`
+	ReceiverID string    `json:"receiver"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	MaxAccess  int       `json:"max_access"`
+}
+
 func CreateTTLIndex(ctx context.Context, collection *mongo.Collection) error {
 	indexModel := mongo.IndexModel{
 		Keys:    bson.D{{Key: "expires_at", Value: 1}},

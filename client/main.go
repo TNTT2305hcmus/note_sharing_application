@@ -32,7 +32,7 @@ func printHelp() {
 	fmt.Println("6. Gửi file (Chia sẻ):              go run main.go send -note <id> -t <receiver> [-exp 1h] [-max 1] -u <current username>")
 	fmt.Println("7. Xóa file gốc:                    go run main.go deleteFile -id <id> -u <current username>")
 	fmt.Println("8. Hủy chia sẻ:                     go run main.go cancelSharingURL -id <id> -u <current username>")
-	fmt.Println("9. Đọc ghi chú được chia sẻ:        go run main.go readSharedNote -id <url_id> -sender <sender_name> -u <current username> -o <output_file>")
+	fmt.Println("9. Đọc ghi chú được chia sẻ:        go run main.go readSharedNote -url <url> -sender <sender_name> -u <current username> -o <output_file>")
 }
 
 func main() {
@@ -233,7 +233,7 @@ func handleListSharedFile(username string) {
 		return
 	}
 	for _, u := range urls {
-		fmt.Printf("- URL ID: %s | Từ: %s | Note ID: %s | Hết hạn: %v\n",
+		fmt.Printf("- URL: %s | Từ: %s | Note ID: %s | Hết hạn: %v\n",
 			u.ID, u.SenderID, u.NoteID, u.ExpiresAt)
 	}
 }
@@ -264,7 +264,6 @@ func handleSaveFile(filePath, username string) {
 		fmt.Printf("Lỗi mã hóa local: %v\n", err)
 		return
 	}
-
 	// Upload lên server
 	noteID, err := services.CreateNote(session.Token, cipherTextBase64, encryptedAESKey)
 	if err != nil {
@@ -316,8 +315,6 @@ func handleSendFile(noteID, receiver, expiresIn string, maxAccess int, username 
 		return
 	}
 
-	// Giải mã EncryptedAESKey bằng password
-	fmt.Println("Đang giải mã khóa AES gốc...")
 	aesKeyRawHex, err := crypto.DecryptByPassword(targetNote.EncryptedAesKey, password)
 	if err != nil {
 		fmt.Println("Sai mật khẩu hoặc dữ liệu lỗi:", err)
@@ -423,10 +420,10 @@ func handleCancelSharing(noteID, username string) {
 // B2. Lấy PubKey của Sender -> Tính Shared Secret K.
 // B3. Dùng K giải mã lấy AES Key gốc.
 // B4. Dùng AES Key giải mã CipherText -> Ghi ra file.
-func handleReadSharedNote(urlID, sender, outFile, username string) {
+func handleReadSharedNote(url, sender, outFile, username string) {
 	// Kiểm tra đầu vào
-	if urlID == "" || sender == "" || outFile == "" || username == "" {
-		fmt.Println("Thiếu thông tin. Cần: -id <url_id> -sender <name> -o <path> -u <me>")
+	if url == "" || sender == "" || outFile == "" || username == "" {
+		fmt.Println("Thiếu thông tin. Cần: -url <url> -sender <name> -o <path> -u <me>")
 		return
 	}
 
@@ -435,6 +432,12 @@ func handleReadSharedNote(urlID, sender, outFile, username string) {
 		fmt.Println("Lỗi session:", err)
 		return
 	}
+
+	parts := strings.Split(url, "/")
+	if len(parts) == 0 {
+		fmt.Println("URL trả về rỗng hoặc sai định dạng")
+	}
+	urlID := parts[len(parts)-1] // Lấy phần tử cuối cùng
 
 	// Nhập mật khẩu để giải mã EncryptedPrivKey
 	password := promptPassword("Nhập mật khẩu của BẠN để giải mã: ")

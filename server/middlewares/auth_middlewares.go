@@ -46,7 +46,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		claims, err := services.ValidateAuthJWT(token)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ hoặc đã hết hạn"})
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Token không hợp lệ hoặc đã hết hạn, hãy đăng nhập lại."})
 			c.Abort()
 			return
 		}

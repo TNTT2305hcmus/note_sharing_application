@@ -53,9 +53,11 @@ func CreateNoteUrl(noteId, token, sharedEncryptedAESKey, expiresIn, receiver str
 	}
 
 	var result struct {
-		Url string `json:"url"`
+		Message string `json:"message"`
 	}
 	_ = json.Unmarshal(body, &result)
+
+	fmt.Println(result.Message)
 	return nil
 }
 
