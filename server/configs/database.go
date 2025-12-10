@@ -13,10 +13,9 @@ import (
 
 var DB *mongo.Database
 
-func ConnectDB() {
+func ConnectDB(dbName string) {
 	// Lấy biến môi trường trong .env
 	mongoURI := os.Getenv("MONGO_URI")
-	dbName := os.Getenv("DB_NAME")
 
 	if mongoURI == "" {
 		log.Fatal("Chưa cấu hình MONGO_URI trong file .env")

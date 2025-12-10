@@ -41,25 +41,38 @@ func CreateTTLIndex(ctx context.Context, collection *mongo.Collection) error {
 
 // Hàm xử lý truy cập (Gọi mỗi khi user xem link)
 func AccessUrl(ctx context.Context, collection *mongo.Collection, urlID primitive.ObjectID) (*Url, error) {
-	var updatedUrl Url
+	var url Url
+	err1 := collection.FindOne(ctx, bson.M{"_id": urlID}).Decode(&url)
+	if err1 != nil {
+		return nil, err1 // Lỗi kết nối hoặc không tìm thấy ID
+	}
+
+	// So sánh thời gian: Nếu hiện tại > thời gian hết hạn
+	if time.Now().UTC().After(url.ExpiresAt) {
+		// Xóa luôn document này
+		go func() {
+			collection.DeleteOne(context.Background(), bson.M{"_id": urlID})
+			fmt.Printf("Deleted Expired URL %s\n", urlID.Hex())
+		}()
+		return nil, fmt.Errorf("link đã hết hạn")
+	}
 
 	// Tăng view
-	filter := bson.M{"_id": urlID}
 	update := bson.M{"$inc": bson.M{"accessed": 1}}
 	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
 
-	err := collection.FindOneAndUpdate(ctx, filter, update, opts).Decode(&updatedUrl)
-	if err != nil {
-		return nil, err
+	err2 := collection.FindOneAndUpdate(ctx, bson.M{"_id": urlID}, update, opts).Decode(&url)
+	if err2 != nil {
+		return nil, err2
 	}
 
 	// Logic xóa nếu vượt quá giới hạn
-	if updatedUrl.Accessed >= updatedUrl.MaxAccess {
+	if url.Accessed >= url.MaxAccess {
 		go func() {
 			collection.DeleteOne(context.Background(), bson.M{"_id": urlID})
 			fmt.Printf("Deleted URL %s (Limit reached)\n", urlID.Hex())
 		}()
 	}
 
-	return &updatedUrl, nil
+	return &url, nil
 }

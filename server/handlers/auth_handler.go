@@ -140,8 +140,6 @@ func LoginHandler(c *gin.Context) {
 	// ObjectID -> Hex string
 	tokenString, err := services.GenerateAuthJWT(foundUser.ID.Hex(), foundUser.Username)
 
-	fmt.Println("\nToken String: \n", tokenString)
-
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Fail to generate JWT Token"})
 		return

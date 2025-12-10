@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"note_sharing_application/server/configs"
 	"note_sharing_application/server/handlers"
 	"note_sharing_application/server/routers"
 	"note_sharing_application/server/utils"
@@ -30,7 +31,6 @@ import (
 const TestDBName = "NoteAppDB_Test_Auth"
 
 var router *gin.Engine
-var testDB *mongo.Database
 
 func TestMain(m *testing.M) {
 	// Set Gin mode Test
@@ -45,10 +45,10 @@ func TestMain(m *testing.M) {
 		log.Fatal("Không thể kết nối MongoDB Test:", err)
 	}
 
-	testDB = client.Database(TestDBName)
+	configs.DB = client.Database(TestDBName)
 
 	// Gán đè biến toàn cục trong handlers để dùng DB Test
-	handlers.UserCollection = testDB.Collection("users")
+	handlers.UserCollection = configs.DB.Collection("users")
 
 	// Sinh khóa RSA cho Server
 	if err := utils.GenerateServerRSAKeys(); err != nil {
@@ -63,7 +63,7 @@ func TestMain(m *testing.M) {
 
 	// Xóa DB sau test
 	fmt.Println("\n Đang dọn dẹp Database Test...")
-	testDB.Drop(context.Background())
+	configs.DB.Drop(context.Background())
 
 	os.Exit(exitVal)
 }

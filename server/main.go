@@ -44,7 +44,7 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	configs.ConnectDB()
+	configs.ConnectDB(os.Getenv("DB_NAME"))
 	handlers.UserCollection = configs.GetCollection("users")
 
 	if handlers.UserCollection == nil {
@@ -74,9 +74,6 @@ func main() {
 		serverPort = "8080"
 		fmt.Println("Không tìm thấy SERVER_PORT, sử dụng mặc định: 8080")
 	}
-
-	configs.ConnectDB()
-	handlers.UserCollection = configs.GetCollection("users")
 
 	if err := r.Run(":" + serverPort); err != nil {
 		log.Fatal("Lỗi: Không thể khởi động server:", err)

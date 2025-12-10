@@ -1,25 +1,20 @@
 package tests
 
 import (
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
-	"io"
+	"encoding/json"
 	"net/http"
-	"note_sharing_application/client/services"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-const (
-	BaseURL = "http://localhost:8080"
-)
-
 func TestJWT(t *testing.T) {
-	client := &http.Client{}
-
 	//CHUẨN BỊ DỮ LIỆU TEST
 	// Dữ liệu mẫu
 	username := "jwt_test"
@@ -28,11 +23,42 @@ func TestJWT(t *testing.T) {
 	mockPubKey := "MockPublicKeyHexString"
 	mockEncPrivKey := "MockEncryptedPrivateKeyHex"
 
-	services.Register(username, password, mockPubKey, mockEncPrivKey)
+	//Đăng ký
+	encryptedPass := encryptPasswordForTest(password)
+	regBody := map[string]string{
+		"username":          username,
+		"password":          encryptedPass,
+		"public_key":        mockPubKey,
+		"encrypted_privKey": mockEncPrivKey,
+	}
+	regJson, _ := json.Marshal(regBody)
+
+	// Tạo Request giả
+	reg, _ := http.NewRequest("POST", "/auth/register", bytes.NewBuffer(regJson))
+	reg.Header.Set("Content-Type", "application/json")
+
+	// Ghi lại Response
+	wReg := httptest.NewRecorder()
+	router.ServeHTTP(wReg, reg)
 
 	//Đăng nhập để nhận token về test
-	token, _, _ := services.Login(username, password)
-	//Nhận token để test
+	logBody := map[string]string{
+		"username": username,
+		"password": encryptedPass,
+	}
+	logJson, _ := json.Marshal(logBody)
+
+	log, _ := http.NewRequest("POST", "/auth/login", bytes.NewBuffer(logJson))
+	wLog := httptest.NewRecorder()
+	router.ServeHTTP(wLog, log)
+	var response map[string]interface{}
+	err := json.Unmarshal(wLog.Body.Bytes(), &response)
+	if err != nil {
+		t.Fatal("Lỗi parse JSON:", err)
+	}
+
+	// Lấy ra và ép kiểu
+	token, _ := response["token"].(string)
 
 	// Token bị sửa body
 	testBodyToken := token[:len(token)-5] + "XXXXX"
@@ -105,25 +131,19 @@ func TestJWT(t *testing.T) {
 	//TEST
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			req, _ := http.NewRequest("GET", BaseURL+"/notes/owned", nil)
+			req, _ := http.NewRequest("GET", "/notes/owned", nil)
 
 			if tc.headerValue != "" {
 				req.Header.Set("Authorization", tc.headerValue)
 			}
 
-			resp, err := client.Do(req)
-			if err != nil {
-				t.Fatalf("Lỗi gọi API: %v", err)
-			}
-			defer resp.Body.Close()
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, req)
 
-			bodyBytes, _ := io.ReadAll(resp.Body)
-			bodyString := string(bodyBytes)
-
-			assert.Equal(t, tc.expectedStatus, resp.StatusCode, "Status Code sai")
+			assert.Equal(t, tc.expectedStatus, w.Code, "Status Code sai")
 
 			if tc.expectedError != "" {
-				assert.Contains(t, bodyString, tc.expectedError, "Thông báo lỗi không khớp")
+				assert.Contains(t, w.Body.String(), tc.expectedError, "Thông báo lỗi không khớp")
 			}
 		})
 	}

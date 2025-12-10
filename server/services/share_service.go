@@ -67,9 +67,6 @@ func GetNote(reqUrl models.Url) (models.Note, error) {
 	if err != nil {
 		return models.Note{}, fmt.Errorf("không thể truy cập link này: %v", err)
 	}
-	if time.Now().UTC().After(validUrl.ExpiresAt) {
-		return models.Note{}, fmt.Errorf("không thể truy cập link này: %v", err)
-	}
 	// Lấy Note gốc dựa trên NoteID lưu trong Url
 	// Vì trong struct Url, NoteID là string, cần convert sang ObjectID để query
 	noteOID, err := primitive.ObjectIDFromHex(validUrl.NoteID)
