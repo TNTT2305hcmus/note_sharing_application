@@ -103,16 +103,16 @@ func main() {
 		handleCancelSharing(*noteID, *user)
 
 	case "readSharedNote":
-		// Cú pháp: readSharedNote -id <url_id> -sender <sender> -o <path> -u <me>
+		// Cú pháp: readSharedNote -url <url> -sender <sender> -o <path> -u <me>
 		cmd := flag.NewFlagSet("readSharedNote", flag.ExitOnError)
 
-		urlID := cmd.String("id", "", "ID của URL chia sẻ (Lấy từ listSharedFile)")
+		url := cmd.String("url", "", "URL chia sẻ (Lấy từ listSharedFile)")
 		sender := cmd.String("sender", "", "Username người gửi (Lấy từ listSharedFile)")
 		outFile := cmd.String("o", "", "Đường dẫn file để lưu kết quả giải mã")
 		user := cmd.String("u", "", "Username của bạn")
 
 		cmd.Parse(os.Args[2:])
-		handleReadSharedNote(*urlID, *sender, *outFile, *user)
+		handleReadSharedNote(*url, *sender, *outFile, *user)
 
 	default:
 		printHelp()
