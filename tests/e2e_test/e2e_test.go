@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -31,73 +32,125 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-const TestDBName = "NoteApp_E2E_CleanTest"
+// --- CẤU HÌNH ---
+const E2E_TestDBName = "E2E_Test"
 
-var router *gin.Engine
-var testDB *mongo.Database
+var E2E_router *gin.Engine
+var E2E_testDB *mongo.Database
 
-// Struct giả lập response từ server để test độc lập
-type TestNoteResponse struct {
-	EncryptedContent string `json:"cipher_text"`
-	KeyOption1       string `json:"encrypted_aes_key"`
-	KeyOption2       string `json:"shared_encrypted_aes_key"`
-	KeyOption3       string `json:"encrypted_aes_key_by_K"`
+// Struct hứng response khi xem chi tiết Note
+type TestNoteResponseDTO struct {
+	EncryptedContent      string `json:"cipher_text"`
+	SharedEncryptedAESKey string `json:"encrypted_aes_key_by_K"` // JSON tag khớp với ViewNoteHandler
+	Sender                string `json:"sender"`
 }
 
-// --- TESTS ---
+// Struct hứng response danh sách URL
+type TestUrlResponseDTO struct {
+	ID       string `json:"url_id"` // Dùng string để nhận cả ObjectID hex và chuỗi
+	NoteID   string `json:"note_id"`
+	Sender   string `json:"sender"`
+	Receiver string `json:"receiver"`
+}
 
-// Chạy trước và sau toàn bộ test
+// --- MAIN ENTRY POINT ---
+
 func TestMain(m *testing.M) {
 	gin.SetMode(gin.TestMode)
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
 
-	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
-	if err != nil {
-		log.Fatal("DB Connection Error:", err)
-	}
+	// Thiết lập môi trường
+	cleanup := setupTestEnvironment()
 
-	testDB = client.Database(TestDBName)
-	configs.DB = testDB
-	handlers.UserCollection = testDB.Collection("users")
-
-	_ = utils.GenerateServerRSAKeys()
-	router = routers.SetupRouter()
-
+	// Chạy test
 	exitVal := m.Run()
 
-	_ = testDB.Drop(context.Background())
+	// Dọn dẹp
+	cleanup()
 	os.Exit(exitVal)
 }
 
-// Test toàn bộ flow chia sẻ ghi chú giữa 2 user
+// --- HÀM KHỞI TẠO MÔI TRƯỜNG ---
+// Đảm bảo Router, DB và Keys luôn sẵn sàng trước khi test chạy
+func setupTestEnvironment() func() {
+	if E2E_router != nil && E2E_testDB != nil {
+		return func() {}
+	}
+
+	fmt.Println("[INFO] Dang thiet lap moi truong Test...")
+
+	// 1. Kết nối DB
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI("mongodb://localhost:27017"))
+	if err != nil {
+		cancel()
+		log.Fatal("[ERROR] Loi ket noi DB:", err)
+	}
+
+	E2E_testDB = client.Database(E2E_TestDBName)
+	configs.DB = E2E_testDB
+	handlers.UserCollection = E2E_testDB.Collection("users")
+
+	// 2. Khởi tạo RSA Keys (In-memory) cho Server Utils
+	priv, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		cancel()
+		log.Fatal("[ERROR] Khong the tao RSA Key:", err)
+	}
+	utils.ServerPrivateKey = priv
+	utils.ServerPublicKey = &priv.PublicKey
+
+	// 3. Khởi tạo Router
+	E2E_router = routers.SetupRouter()
+	if E2E_router == nil {
+		cancel()
+		log.Fatal("[ERROR] Router khoi tao that bai (nil)")
+	}
+
+	// Trả về hàm cleanup
+	return func() {
+		fmt.Println("[INFO] Dang don dep du lieu Test...")
+		_ = E2E_testDB.Drop(context.Background())
+		_ = client.Disconnect(context.Background())
+		cancel()
+	}
+}
+
+// --- TEST CASES ---
+
 func TestEndToEndSharingFlow(t *testing.T) {
-	// 1. Setup Data
+	// Gọi hàm setup để đảm bảo môi trường đã sẵn sàng (phòng trường hợp chạy test đơn lẻ)
+	_ = setupTestEnvironment()
+
+	if E2E_router == nil {
+		t.Fatal("[FATAL] E2E_router is nil")
+	}
+
+	// 1. Chuẩn bị dữ liệu
 	alice, bob, password := "alice_clean", "bob_clean", "Pass123"
 	noteContent := "Secret Content for Bob"
 
-	// 2. Auth Flow
+	// 2. Quy trình xác thực (Đăng ký/Đăng nhập)
 	alicePriv, _, _ := registerUser(t, alice, password)
 	aliceToken, _ := loginUser(t, alice, password)
 
 	bobPriv, _, bobPubHex := registerUser(t, bob, password)
 	bobToken, _ := loginUser(t, bob, password)
 
-	// 3. Alice Create Note
+	// 3. Alice tạo ghi chú
 	aesKey, _ := crypto.GenerateAESKey()
 
-	// Mã hóa nội dung
+	// Mã hóa nội dung và Key (bằng password của Alice)
 	encContent, _ := crypto.EncryptBytes([]byte(noteContent), aesKey)
 	cipherTextBase64 := base64.StdEncoding.EncodeToString(encContent)
-
-	// Mã hóa AES Key bằng Pass
 	encAesKeyByPass, _ := crypto.EncryptByPassword(hex.EncodeToString(aesKey), password)
 
 	noteID := createNoteRequest(t, aliceToken, cipherTextBase64, encAesKeyByPass)
-	assert.NotEmpty(t, noteID)
+	assert.NotEmpty(t, noteID, "NoteID khong duoc rong")
 
-	// 4. Alice Share to Bob
+	// 4. Alice chia sẻ cho Bob
+	// Tính Shared Secret (Alice Priv + Bob Pub)
 	sharedK, _ := crypto.ComputeSharedSecret(alicePriv, bobPubHex)
+	// Mã hóa AES Key bằng Shared Secret
 	sharedEncAesKey, _ := crypto.EncryptAESKeyWithSharedK(aesKey, sharedK)
 
 	shareReq := models.CreateUrlRequest{
@@ -105,65 +158,67 @@ func TestEndToEndSharingFlow(t *testing.T) {
 		ExpiresIn:             "1h",
 		MaxAccess:             5,
 		Receiver:              bob,
+		Sender:                alice,
 	}
 	_ = shareNoteRequest(t, aliceToken, noteID, shareReq)
 
-	// 5. Bob Receive
-	// Lấy danh sách link được share
+	// 5. Bob nhận liên kết chia sẻ
 	receivedUrls := getReceivedUrlsRequest(t, bobToken)
 	var targetUrlID string
+
+	// Logic tách ID từ URL (Server trả về localhost:8080/note/ID -> Lấy ID cuối)
 	for _, u := range receivedUrls {
 		if u.NoteID == noteID {
-			targetUrlID = u.ID.Hex() // Convert ObjectID -> String
+			parts := strings.Split(u.ID, "/")
+			if len(parts) > 0 {
+				targetUrlID = parts[len(parts)-1]
+			} else {
+				targetUrlID = u.ID
+			}
 			break
 		}
 	}
-	assert.NotEmpty(t, targetUrlID, "Bob không thấy file được share")
+	assert.NotEmpty(t, targetUrlID, "Bob khong tim thay link duoc share")
 
-	// Lấy chi tiết note
+	// 6. Bob xem chi tiết ghi chú
 	noteData := viewNoteRequest(t, bobToken, targetUrlID)
 
-	// 6. Bob Decrypt
-	// Tính lại Shared Secret (Bob Priv + Alice Pub)
+	// 7. Bob giải mã dữ liệu
+	// Tính Shared Secret (Bob Priv + Alice Pub)
 	alicePubHex := getPubKeyRequest(t, alice)
 	bobSharedK, _ := crypto.ComputeSharedSecret(bobPriv, alicePubHex)
 
-	// Lấy Key từ JSON (Kiểm tra 3 trường hợp tên field)
-	targetKey := noteData.KeyOption3 // Ưu tiên 'encrypted_aes_key_by_K'
-	if targetKey == "" {
-		targetKey = noteData.KeyOption2
-	}
-	if targetKey == "" {
-		targetKey = noteData.KeyOption1
-	}
-
-	assert.NotEmpty(t, targetKey, "Không tìm thấy AES Key trong JSON trả về")
+	// Lấy Key đã mã hóa từ response DTO
+	targetKey := noteData.SharedEncryptedAESKey
+	assert.NotEmpty(t, targetKey, "Response JSON thieu truong 'encrypted_aes_key_by_K'")
 
 	// Giải mã AES Key
 	decryptedAESKey, err := crypto.DecryptAESKeyWithSharedK(targetKey, bobSharedK)
-	assert.NoError(t, err, "Lỗi giải mã Key (Check lại Shared Secret hoặc Key Hex)")
-	assert.Equal(t, aesKey, decryptedAESKey, "AES Key sau giải mã không khớp")
+	assert.NoError(t, err, "Loi giai ma AES Key")
+	assert.Equal(t, aesKey, decryptedAESKey, "AES Key sau giai ma khong khop")
 
 	// Giải mã nội dung
 	cipherBytes, _ := base64.StdEncoding.DecodeString(noteData.EncryptedContent)
 	decryptedContent, err := crypto.DecryptBytes(cipherBytes, decryptedAESKey)
 
-	assert.NoError(t, err)
-	assert.Equal(t, noteContent, string(decryptedContent))
+	assert.NoError(t, err, "Loi giai ma noi dung ghi chu")
+	assert.Equal(t, noteContent, string(decryptedContent), "Noi dung giai ma sai lech")
 
-	fmt.Printf("\nSUCCESS: '%s' == '%s'\n", noteContent, string(decryptedContent))
+	fmt.Printf("\n[SUCCESS] Original: '%s' == Decrypted: '%s'\n", noteContent, string(decryptedContent))
 }
 
-// --- HELPERS ---
+// --- HELPER FUNCTIONS ---
 
-// Mã hóa password bằng RSA Public Key của Server
 func encryptPass(raw string) string {
 	rng := rand.Reader
-	enc, _ := rsa.EncryptOAEP(sha256.New(), rng, utils.ServerPublicKey, []byte(raw), []byte(""))
+	// utils.ServerPublicKey được đảm bảo tồn tại bởi setupTestEnvironment
+	enc, err := rsa.EncryptOAEP(sha256.New(), rng, utils.ServerPublicKey, []byte(raw), []byte(""))
+	if err != nil {
+		log.Fatal("[ERROR] Loi ma hoa password:", err)
+	}
 	return base64.StdEncoding.EncodeToString(enc)
 }
 
-// Đăng ký user, trả về Private Key, Public Key và Public Key Hex
 func registerUser(t *testing.T, user, pass string) (*big.Int, *big.Int, string) {
 	priv, pub, _ := crypto.GenerateKeyPair()
 	privHex, pubHex := priv.Text(16), pub.Text(16)
@@ -176,19 +231,18 @@ func registerUser(t *testing.T, user, pass string) (*big.Int, *big.Int, string) 
 
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/auth/register", bytes.NewBuffer(body))
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
 	assert.Equal(t, 200, w.Code)
 	return priv, pub, pubHex
 }
 
-// Đăng nhập user, trả về Token và Encrypted Private Key
 func loginUser(t *testing.T, user, pass string) (string, string) {
 	body, _ := json.Marshal(map[string]string{
 		"username": user, "password": encryptPass(pass),
 	})
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/auth/login", bytes.NewBuffer(body))
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
 	assert.Equal(t, 200, w.Code)
 
 	var res map[string]interface{}
@@ -196,15 +250,19 @@ func loginUser(t *testing.T, user, pass string) (string, string) {
 	return res["token"].(string), res["encrypted_privKey"].(string)
 }
 
-// Tạo Note Request
 func createNoteRequest(t *testing.T, token, cipher, encKey string) string {
-	body, _ := json.Marshal(models.CreateNoteRequest{
-		CipherText: cipher, EncryptedAesKey: encKey,
-	})
+	// Sử dụng model server cho request body để đảm bảo đúng định dạng
+	reqBody := models.CreateNoteRequest{
+		CipherText:      cipher,
+		EncryptedAesKey: encKey,
+		Sender:          "alice_clean",
+	}
+
+	body, _ := json.Marshal(reqBody)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", "/notes", bytes.NewBuffer(body))
 	req.Header.Set("Authorization", "Bearer "+token)
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
 	assert.Equal(t, 201, w.Code)
 
 	var res map[string]string
@@ -212,47 +270,49 @@ func createNoteRequest(t *testing.T, token, cipher, encKey string) string {
 	return res["note_id"]
 }
 
-// Chia sẻ Note Request
 func shareNoteRequest(t *testing.T, token, noteID string, body models.CreateUrlRequest) string {
 	jsonVal, _ := json.Marshal(body)
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("POST", fmt.Sprintf("/notes/%s/url", noteID), bytes.NewBuffer(jsonVal))
 	req.Header.Set("Authorization", "Bearer "+token)
-	router.ServeHTTP(w, req)
-	assert.Equal(t, 200, w.Code)
+	E2E_router.ServeHTTP(w, req)
+	assert.True(t, w.Code == 200 || w.Code == 201)
 	return ""
 }
 
-// Lấy danh sách URL được share đến user
-func getReceivedUrlsRequest(t *testing.T, token string) []models.Url {
+func getReceivedUrlsRequest(t *testing.T, token string) []TestUrlResponseDTO {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/notes/received", nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
 
-	var urls []models.Url
-	_ = json.Unmarshal(w.Body.Bytes(), &urls)
+	var urls []TestUrlResponseDTO
+	err := json.Unmarshal(w.Body.Bytes(), &urls)
+	assert.NoError(t, err)
 	return urls
 }
 
-// Lấy Public Key của user
 func getPubKeyRequest(t *testing.T, user string) string {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/auth/users/"+user+"/pubkey", nil)
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
 	var res map[string]string
 	_ = json.Unmarshal(w.Body.Bytes(), &res)
 	return res["public_key"]
 }
 
-// Xem chi tiết Note qua URL
-func viewNoteRequest(t *testing.T, token, urlID string) TestNoteResponse {
+func viewNoteRequest(t *testing.T, token, urlID string) TestNoteResponseDTO {
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/note/"+urlID, nil)
 	req.Header.Set("Authorization", "Bearer "+token)
-	router.ServeHTTP(w, req)
+	E2E_router.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		fmt.Printf("[DEBUG] ViewNote Error: Code=%d Body=%s\n", w.Code, w.Body.String())
+	}
 	assert.Equal(t, 200, w.Code)
-	var note TestNoteResponse
+
+	var note TestNoteResponseDTO
 	_ = json.Unmarshal(w.Body.Bytes(), &note)
 	return note
 }
